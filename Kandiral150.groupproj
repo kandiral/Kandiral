@@ -1,0 +1,84 @@
+﻿	<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+		<PropertyGroup>
+			<ProjectGuid>{5668F221-5810-401C-A223-6DE9067B092F}</ProjectGuid>
+		</PropertyGroup>
+		<ItemGroup>
+			<Projects Include="packages\d150\KRCommon.dproj">
+				<Dependencies/>
+			</Projects>
+			<Projects Include="packages\d150\KRAutomation.dproj">
+				<Dependencies/>
+			</Projects>
+			<Projects Include="packages\d150\KRFile.dproj">
+				<Dependencies/>
+			</Projects>
+			<Projects Include="packages\d150\KRGraphics.dproj">
+				<Dependencies/>
+			</Projects>
+			<Projects Include="packages\d150\KRWeb.dproj">
+				<Dependencies/>
+			</Projects>
+		</ItemGroup>
+		<ProjectExtensions>
+			<Borland.Personality>Default.Personality.12</Borland.Personality>
+			<Borland.ProjectType/>
+			<BorlandProject>
+				<Default.Personality/>
+			</BorlandProject>
+		</ProjectExtensions>
+		<Target Name="KRCommon">
+			<MSBuild Projects="packages\d150\KRCommon.dproj"/>
+		</Target>
+		<Target Name="KRCommon:Clean">
+			<MSBuild Projects="packages\d150\KRCommon.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="KRCommon:Make">
+			<MSBuild Projects="packages\d150\KRCommon.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="KRAutomation">
+			<MSBuild Projects="packages\d150\KRAutomation.dproj"/>
+		</Target>
+		<Target Name="KRAutomation:Clean">
+			<MSBuild Projects="packages\d150\KRAutomation.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="KRAutomation:Make">
+			<MSBuild Projects="packages\d150\KRAutomation.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="KRFile">
+			<MSBuild Projects="packages\d150\KRFile.dproj"/>
+		</Target>
+		<Target Name="KRFile:Clean">
+			<MSBuild Projects="packages\d150\KRFile.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="KRFile:Make">
+			<MSBuild Projects="packages\d150\KRFile.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="KRGraphics">
+			<MSBuild Projects="packages\d150\KRGraphics.dproj"/>
+		</Target>
+		<Target Name="KRGraphics:Clean">
+			<MSBuild Projects="packages\d150\KRGraphics.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="KRGraphics:Make">
+			<MSBuild Projects="packages\d150\KRGraphics.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="KRWeb">
+			<MSBuild Projects="packages\d150\KRWeb.dproj"/>
+		</Target>
+		<Target Name="KRWeb:Clean">
+			<MSBuild Projects="packages\d150\KRWeb.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="KRWeb:Make">
+			<MSBuild Projects="packages\d150\KRWeb.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="Build">
+			<CallTarget Targets="KRCommon;KRAutomation;KRFile;KRGraphics;KRWeb"/>
+		</Target>
+		<Target Name="Clean">
+			<CallTarget Targets="KRCommon:Clean;KRAutomation:Clean;KRFile:Clean;KRGraphics:Clean;KRWeb:Clean"/>
+		</Target>
+		<Target Name="Make">
+			<CallTarget Targets="KRCommon:Make;KRAutomation:Make;KRFile:Make;KRGraphics:Make;KRWeb:Make"/>
+		</Target>
+		<Import Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')" Project="$(BDS)\Bin\CodeGear.Group.Targets"/>
+	</Project>

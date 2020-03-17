@@ -1,0 +1,52 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>1899.12.30 00:00:00.000.954,=X:\Components\Kandiral\Common\KRListView.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.907,=X:\Components\Kandiral\Common\KRImageList.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.502,=rtl.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.862,=X:\Components\Kandiral\Common\KRComboBox.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.822,=rtl.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.038,=X:\Components\Kandiral\Net\KRTCPSocketServer.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.102,=X:\Components\Kandiral\Common\KRThreadQueue.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.978,=X:\Components\Kandiral\Common\KRNormalArray.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.076,=X:\Components\Kandiral\Common\KRThread.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.319,=X:\Components\Kandiral\Utils\ISO3166.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.734,=designide.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.040,=X:\Components\Kandiral\Utils\KRWindows.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.901,=X:\Components\Kandiral\Net\KRBTSocketServer.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.931,=X:\Components\Kandiral\Common\KRIniConfig.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.026,=X:\Components\Kandiral\Common\KRRadioButton.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.815,=X:\Components\Kandiral\Common\KRCheckBox.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.126,=X:\Components\Kandiral\Common\KRTimer.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.010,=X:\Components\Kandiral\Net\KRTCPSocketClient.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.153,=X:\Components\Kandiral\Common\KRValueEdit.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.180,=X:\Components\Kandiral\Common\KRVersionInfo.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.855,=X:\Components\Kandiral\Utils\KRCRC.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.359,=X:\Components\Kandiral\Net\KRUDPSocketServer.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.456,=X:\Components\Kandiral\Common\KRBLEdit.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.953,=X:\Components\Kandiral\Net\KRParserCfg.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.202,=IndySystem.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.981,=X:\Components\Kandiral\Net\KRSockets.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.927,=X:\Components\Kandiral\Net\KRParser.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.884,=X:\Components\Kandiral\Common\KRComponentCollection.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.826,=X:\Components\Kandiral\Utils\funcs.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.916,=X:\Components\Kandiral\Utils\KRRuntimeErrors.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.886,=X:\Components\Kandiral\Utils\KRHTMLParseUtils.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.977,=X:\Components\Kandiral\Utils\KRStrUtils.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.107,=X:\Components\Kandiral\packages\d250\KRCommonRegister.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.945,=X:\Components\Kandiral\Utils\KRStreamCoder.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.238,=IndyProtocols.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.875,=X:\Components\Kandiral\Net\KRBTSocketClient.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.001,=X:\Components\Kandiral\Common\KRProgressBar.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.275,=IndyCore.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.008,=X:\Components\Kandiral\Utils\KRTypes.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.353,C:\Users\kandiral\Documents\Embarcadero\Studio\Projects\Package1.dproj=X:\Components\Kandiral\packages\d250\KRCommon.dproj</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.771,=X:\Components\Kandiral\Common\KRBoundLabel.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.751,=X:\Components\Kandiral\Common\KRBluetooth.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.072,=X:\Components\Kandiral\Utils\lgop.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.105,=X:\Components\Kandiral\Utils\md5.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.365,=X:\Components\Kandiral\Utils\uLkJSON.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.839,=X:\Components\Kandiral\Common\KRCheckGroupBox.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.052,=X:\Components\Kandiral\Common\KRRichEdit.pas</Transaction>
+  </Transactions>
+</BorlandProject>

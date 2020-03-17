@@ -1,0 +1,199 @@
+﻿	<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+		<PropertyGroup>
+			<ProjectGuid>{38885F2C-139C-478B-81E4-F81FBB932A16}</ProjectGuid>
+			<MainSource>KRCommon.dpk</MainSource>
+			<ProjectVersion>13.4</ProjectVersion>
+			<FrameworkType>VCL</FrameworkType>
+			<Base>True</Base>
+			<Config Condition="'$(Config)'==''">Release</Config>
+			<Platform Condition="'$(Platform)'==''">Win32</Platform>
+			<TargetedPlatforms>1</TargetedPlatforms>
+			<AppType>Package</AppType>
+		</PropertyGroup>
+		<PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
+			<Base>true</Base>
+		</PropertyGroup>
+		<PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Base)'=='true') or '$(Base_Win32)'!=''">
+			<Base_Win32>true</Base_Win32>
+			<CfgParent>Base</CfgParent>
+			<Base>true</Base>
+		</PropertyGroup>
+		<PropertyGroup Condition="'$(Config)'=='Debug' or '$(Cfg_1)'!=''">
+			<Cfg_1>true</Cfg_1>
+			<CfgParent>Base</CfgParent>
+			<Base>true</Base>
+		</PropertyGroup>
+		<PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Cfg_1)'=='true') or '$(Cfg_1_Win32)'!=''">
+			<Cfg_1_Win32>true</Cfg_1_Win32>
+			<CfgParent>Cfg_1</CfgParent>
+			<Cfg_1>true</Cfg_1>
+			<Base>true</Base>
+		</PropertyGroup>
+		<PropertyGroup Condition="'$(Config)'=='Release' or '$(Cfg_2)'!=''">
+			<Cfg_2>true</Cfg_2>
+			<CfgParent>Base</CfgParent>
+			<Base>true</Base>
+		</PropertyGroup>
+		<PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Cfg_2)'=='true') or '$(Cfg_2_Win32)'!=''">
+			<Cfg_2_Win32>true</Cfg_2_Win32>
+			<CfgParent>Cfg_2</CfgParent>
+			<Cfg_2>true</Cfg_2>
+			<Base>true</Base>
+		</PropertyGroup>
+		<PropertyGroup Condition="'$(Base)'!=''">
+			<DCC_UnitSearchPath>..\..\$(Config)\$(ProductVersion)\$(Platform);..\..\dfm;..\..\Resources;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+			<VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+			<DCC_UsePackage>rtl;IndyCore;IndySystem;IndyProtocols;$(DCC_UsePackage)</DCC_UsePackage>
+			<DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;$(DCC_Namespace)</DCC_Namespace>
+			<DCC_Description>KRCommon</DCC_Description>
+			<DCC_CBuilderOutput>All</DCC_CBuilderOutput>
+			<DCC_DcpOutput>..\..\$(Config)\$(ProductVersion)\$(Platform)</DCC_DcpOutput>
+			<VerInfo_Locale>1049</VerInfo_Locale>
+			<GenDll>true</GenDll>
+			<DllSuffix>160</DllSuffix>
+			<GenPackage>true</GenPackage>
+			<DCC_DcuOutput>..\..\$(Config)\$(ProductVersion)\$(Platform)</DCC_DcuOutput>
+			<DCC_ExeOutput>.\$(Platform)\$(Config)</DCC_ExeOutput>
+		</PropertyGroup>
+		<PropertyGroup Condition="'$(Base_Win32)'!=''">
+			<VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
+			<DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
+			<VerInfo_Locale>1033</VerInfo_Locale>
+			<VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+		</PropertyGroup>
+		<PropertyGroup Condition="'$(Cfg_1)'!=''">
+			<DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
+			<DCC_Optimize>false</DCC_Optimize>
+			<DCC_GenerateStackFrames>true</DCC_GenerateStackFrames>
+			<DCC_DebugInfoInExe>true</DCC_DebugInfoInExe>
+			<DCC_RemoteDebug>true</DCC_RemoteDebug>
+		</PropertyGroup>
+		<PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
+			<DCC_RemoteDebug>false</DCC_RemoteDebug>
+		</PropertyGroup>
+		<PropertyGroup Condition="'$(Cfg_2)'!=''">
+			<DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
+			<DCC_Define>RELEASE;$(DCC_Define)</DCC_Define>
+		</PropertyGroup>
+		<PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
+			<VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
+			<VerInfo_Locale>1033</VerInfo_Locale>
+		</PropertyGroup>
+		<ItemGroup>
+			<DelphiCompile Include="$(MainSource)">
+				<MainSource>MainSource</MainSource>
+			</DelphiCompile>
+			<DCCReference Include="..\..\Common\KRCommon.dcr"/>
+			<DCCReference Include="rtl.dcp"/>
+			<DCCReference Include="designide.dcp"/>
+			<DCCReference Include="IndyCore.dcp"/>
+			<DCCReference Include="IndySystem.dcp"/>
+			<DCCReference Include="IndyProtocols.dcp"/>
+			<DCCReference Include="KRCommonRegister.pas"/>
+			<DCCReference Include="..\..\Common\KRBluetooth.pas"/>
+			<DCCReference Include="..\..\Common\KRBoundLabel.pas"/>
+			<DCCReference Include="..\..\Common\KRCheckBox.pas"/>
+			<DCCReference Include="..\..\Common\KRCheckGroupBox.pas"/>
+			<DCCReference Include="..\..\Common\KRComboBox.pas"/>
+			<DCCReference Include="..\..\Common\KRComponentCollection.pas"/>
+			<DCCReference Include="..\..\Common\KRImageList.pas"/>
+			<DCCReference Include="..\..\Common\KRIniConfig.pas"/>
+			<DCCReference Include="..\..\Common\KRListView.pas"/>
+			<DCCReference Include="..\..\Common\KRNormalArray.pas"/>
+			<DCCReference Include="..\..\Common\KRProgressBar.pas"/>
+			<DCCReference Include="..\..\Common\KRRadioButton.pas"/>
+			<DCCReference Include="..\..\Common\KRRichEdit.pas"/>
+			<DCCReference Include="..\..\Common\KRThread.pas"/>
+			<DCCReference Include="..\..\Common\KRThreadQueue.pas"/>
+			<DCCReference Include="..\..\Common\KRTimer.pas"/>
+			<DCCReference Include="..\..\Common\KRValueEdit.pas"/>
+			<DCCReference Include="..\..\Common\KRVersionInfo.pas"/>
+			<DCCReference Include="..\..\Net\KRBTSocketClient.pas"/>
+			<DCCReference Include="..\..\Net\KRBTSocketServer.pas"/>
+			<DCCReference Include="..\..\Net\KRParser.pas"/>
+			<DCCReference Include="..\..\Net\KRParserCfg.pas"/>
+			<DCCReference Include="..\..\Net\KRSockets.pas"/>
+			<DCCReference Include="..\..\Net\KRTCPSocketClient.pas"/>
+			<DCCReference Include="..\..\Net\KRTCPSocketServer.pas"/>
+			<DCCReference Include="..\..\Utils\funcs.pas"/>
+			<DCCReference Include="..\..\Utils\KRCRC.pas"/>
+			<DCCReference Include="..\..\Utils\KRHTMLParseUtils.pas"/>
+			<DCCReference Include="..\..\Utils\KRRuntimeErrors.pas"/>
+			<DCCReference Include="..\..\Utils\KRStreamCoder.pas"/>
+			<DCCReference Include="..\..\Utils\KRStrUtils.pas"/>
+			<DCCReference Include="..\..\Utils\KRTypes.pas"/>
+			<DCCReference Include="..\..\Utils\KRWindows.pas"/>
+			<DCCReference Include="..\..\Utils\lgop.pas"/>
+			<DCCReference Include="..\..\Utils\md5.pas"/>
+			<DCCReference Include="..\..\Net\KRUDPSocketServer.pas"/>
+			<DCCReference Include="..\..\Common\KRBLEdit.pas"/>
+			<DCCReference Include="..\..\Utils\ISO3166.pas"/>
+			<DCCReference Include="..\..\Utils\uLkJSON.pas"/>
+			<BuildConfiguration Include="Release">
+				<Key>Cfg_2</Key>
+				<CfgParent>Base</CfgParent>
+			</BuildConfiguration>
+			<BuildConfiguration Include="Base">
+				<Key>Base</Key>
+			</BuildConfiguration>
+			<BuildConfiguration Include="Debug">
+				<Key>Cfg_1</Key>
+				<CfgParent>Base</CfgParent>
+			</BuildConfiguration>
+		</ItemGroup>
+		<ProjectExtensions>
+			<Borland.Personality>Delphi.Personality.12</Borland.Personality>
+			<Borland.ProjectType>Package</Borland.ProjectType>
+			<BorlandProject>
+				<Delphi.Personality>
+					<Source>
+						<Source Name="MainSource">KRCommon.dpk</Source>
+					</Source>
+					<VersionInfo>
+						<VersionInfo Name="IncludeVerInfo">True</VersionInfo>
+						<VersionInfo Name="AutoIncBuild">False</VersionInfo>
+						<VersionInfo Name="MajorVer">1</VersionInfo>
+						<VersionInfo Name="MinorVer">0</VersionInfo>
+						<VersionInfo Name="Release">0</VersionInfo>
+						<VersionInfo Name="Build">0</VersionInfo>
+						<VersionInfo Name="Debug">False</VersionInfo>
+						<VersionInfo Name="PreRelease">False</VersionInfo>
+						<VersionInfo Name="Special">False</VersionInfo>
+						<VersionInfo Name="Private">False</VersionInfo>
+						<VersionInfo Name="DLL">False</VersionInfo>
+						<VersionInfo Name="Locale">1049</VersionInfo>
+						<VersionInfo Name="CodePage">1251</VersionInfo>
+					</VersionInfo>
+					<VersionInfoKeys>
+						<VersionInfoKeys Name="CompanyName"/>
+						<VersionInfoKeys Name="FileDescription"/>
+						<VersionInfoKeys Name="FileVersion">1.0.0.0</VersionInfoKeys>
+						<VersionInfoKeys Name="InternalName"/>
+						<VersionInfoKeys Name="LegalCopyright"/>
+						<VersionInfoKeys Name="LegalTrademarks"/>
+						<VersionInfoKeys Name="OriginalFilename"/>
+						<VersionInfoKeys Name="ProductName"/>
+						<VersionInfoKeys Name="ProductVersion">1.0.0.0</VersionInfoKeys>
+						<VersionInfoKeys Name="Comments"/>
+					</VersionInfoKeys>
+					<Excluded_Packages>
+						<Excluded_Packages Name="$(BDSBIN)\dcloffice2k160.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
+						<Excluded_Packages Name="$(BDSBIN)\dclofficexp160.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
+						<Excluded_Packages Name="C:\Program Files (x86)\FastReport 5 VCL Standard\LibD16\dclfrxTee16.bpl">FastReport 5.0 Tee Components</Excluded_Packages>
+						<Excluded_Packages Name="C:\Program Files (x86)\FastReport 5 VCL Standard\LibD16\dclfsTee16.bpl">FastScript 1.9 Tee Components</Excluded_Packages>
+						<Excluded_Packages Name="C:\Program Files (x86)\FastReport 5 VCL Standard\LibD16\dclfrxIBX16.bpl">FastReport 5.0 IBX Components</Excluded_Packages>
+						<Excluded_Packages Name="C:\Program Files (x86)\FastReport 5 VCL Standard\LibD16\dclfsIBX16.bpl">FastScript 1.9 IBX Components</Excluded_Packages>
+					</Excluded_Packages>
+				</Delphi.Personality>
+				<Deployment/>
+				<Platforms>
+					<Platform value="Win64">False</Platform>
+					<Platform value="OSX32">False</Platform>
+					<Platform value="Win32">True</Platform>
+				</Platforms>
+			</BorlandProject>
+			<ProjectFileVersion>12</ProjectFileVersion>
+		</ProjectExtensions>
+		<Import Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')" Project="$(BDS)\Bin\CodeGear.Delphi.Targets"/>
+		<Import Condition="Exists('$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj')" Project="$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj"/>
+	</Project>

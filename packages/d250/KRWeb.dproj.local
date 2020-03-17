@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>1899.12.30 00:00:00.000.042,=inet.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.686,=KRAutomation.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.007,=vclie.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.424,=X:\Components\Kandiral\Web\KRGoogleAuth.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.723,=rtl.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.080,=X:\Components\Kandiral\packages\d250\KRWebRegister.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.760,=X:\Components\Kandiral\Web\KRGoogleSearchConsole.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.388,=designide.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.041,=KRCommon.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.490,=X:\Components\Kandiral\Web\KRGoogleSheets.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.460,=X:\Components\Kandiral\Web\KRGoogleContacts.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.999,X:\Components\Kandiral\packages\d250\KRWeb.dproj=C:\Users\kandiral\Documents\Embarcadero\Studio\Projects\Package1.dproj</Transaction>
+  </Transactions>
+</BorlandProject>

@@ -1,0 +1,159 @@
+﻿	<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+		<PropertyGroup>
+			<ProjectGuid>{7C0E5B13-72B4-4462-BAAB-286137BC1292}</ProjectGuid>
+			<MainSource>KRCommon.dpk</MainSource>
+			<ProjectVersion>12.3</ProjectVersion>
+			<Base>True</Base>
+			<Config Condition="'$(Config)'==''">Release</Config>
+			<Platform>Win32</Platform>
+			<AppType>Package</AppType>
+			<FrameworkType>None</FrameworkType>
+			<DCC_DCCCompiler>DCC32</DCC_DCCCompiler>
+		</PropertyGroup>
+		<PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
+			<Base>true</Base>
+		</PropertyGroup>
+		<PropertyGroup Condition="'$(Config)'=='Debug' or '$(Cfg_1)'!=''">
+			<Cfg_1>true</Cfg_1>
+			<CfgParent>Base</CfgParent>
+			<Base>true</Base>
+		</PropertyGroup>
+		<PropertyGroup Condition="'$(Config)'=='Release' or '$(Cfg_2)'!=''">
+			<Cfg_2>true</Cfg_2>
+			<CfgParent>Base</CfgParent>
+			<Base>true</Base>
+		</PropertyGroup>
+		<PropertyGroup Condition="'$(Base)'!=''">
+			<DllSuffix>150</DllSuffix>
+			<DCC_UnitSearchPath>..\..\$(Config)\$(ProductVersion)\$(Platform);..\..\dfm;..\..\Resources;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+			<DCC_Description>KRCommon</DCC_Description>
+			<GenPackage>true</GenPackage>
+			<GenDll>true</GenDll>
+			<DCC_DcpOutput>..\..\$(Config)\$(ProductVersion)\$(Platform)</DCC_DcpOutput>
+			<DCC_CBuilderOutput>All</DCC_CBuilderOutput>
+			<DCC_ImageBase>00400000</DCC_ImageBase>
+			<DCC_DcuOutput>..\..\$(Config)\$(ProductVersion)\$(Platform)</DCC_DcuOutput>
+			<DCC_UnitAlias>WinTypes=Windows;WinProcs=Windows;DbiTypes=BDE;DbiProcs=BDE;$(DCC_UnitAlias)</DCC_UnitAlias>
+			<DCC_ExeOutput>.\$(Config)\$(Platform)</DCC_ExeOutput>
+		</PropertyGroup>
+		<PropertyGroup Condition="'$(Cfg_1)'!=''">
+			<DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
+			<DCC_Optimize>false</DCC_Optimize>
+			<DCC_GenerateStackFrames>true</DCC_GenerateStackFrames>
+		</PropertyGroup>
+		<PropertyGroup Condition="'$(Cfg_2)'!=''">
+			<DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
+			<DCC_Define>RELEASE;$(DCC_Define)</DCC_Define>
+		</PropertyGroup>
+		<ItemGroup>
+			<DelphiCompile Include="KRCommon.dpk">
+				<MainSource>MainSource</MainSource>
+			</DelphiCompile>
+			<DCCReference Include="..\..\Common\KRCommon.dcr"/>
+			<DCCReference Include="rtl.dcp"/>
+			<DCCReference Include="designide.dcp"/>
+			<DCCReference Include="IndyProtocols.dcp"/>
+			<DCCReference Include="IndyCore.dcp"/>
+			<DCCReference Include="IndySystem.dcp"/>
+			<DCCReference Include="..\..\Common\KRBluetooth.pas"/>
+			<DCCReference Include="..\..\Common\KRBoundLabel.pas"/>
+			<DCCReference Include="..\..\Common\KRCheckBox.pas"/>
+			<DCCReference Include="..\..\Common\KRCheckGroupBox.pas"/>
+			<DCCReference Include="..\..\Common\KRComboBox.pas"/>
+			<DCCReference Include="..\..\Common\KRComponentCollection.pas"/>
+			<DCCReference Include="..\..\Common\KRImageList.pas"/>
+			<DCCReference Include="..\..\Common\KRIniConfig.pas"/>
+			<DCCReference Include="..\..\Common\KRListView.pas"/>
+			<DCCReference Include="..\..\Common\KRNormalArray.pas"/>
+			<DCCReference Include="..\..\Common\KRProgressBar.pas"/>
+			<DCCReference Include="..\..\Common\KRRadioButton.pas"/>
+			<DCCReference Include="..\..\Common\KRRichEdit.pas"/>
+			<DCCReference Include="..\..\Common\KRThread.pas"/>
+			<DCCReference Include="..\..\Common\KRThreadQueue.pas"/>
+			<DCCReference Include="..\..\Common\KRTimer.pas"/>
+			<DCCReference Include="..\..\Common\KRValueEdit.pas"/>
+			<DCCReference Include="..\..\Common\KRVersionInfo.pas"/>
+			<DCCReference Include="KRCommonRegister.pas"/>
+			<DCCReference Include="..\..\Utils\funcs.pas"/>
+			<DCCReference Include="..\..\Utils\KRCRC.pas"/>
+			<DCCReference Include="..\..\Utils\KRHTMLParseUtils.pas"/>
+			<DCCReference Include="..\..\Utils\KRRuntimeErrors.pas"/>
+			<DCCReference Include="..\..\Utils\KRStreamCoder.pas"/>
+			<DCCReference Include="..\..\Utils\KRStrUtils.pas"/>
+			<DCCReference Include="..\..\Utils\KRTypes.pas"/>
+			<DCCReference Include="..\..\Utils\KRWindows.pas"/>
+			<DCCReference Include="..\..\Utils\lgop.pas"/>
+			<DCCReference Include="..\..\Utils\md5.pas"/>
+			<DCCReference Include="..\..\Net\KRBTSocketClient.pas"/>
+			<DCCReference Include="..\..\Net\KRBTSocketServer.pas"/>
+			<DCCReference Include="..\..\Net\KRParser.pas"/>
+			<DCCReference Include="..\..\Net\KRParserCfg.pas"/>
+			<DCCReference Include="..\..\Net\KRSockets.pas"/>
+			<DCCReference Include="..\..\Net\KRTCPSocketClient.pas"/>
+			<DCCReference Include="..\..\Net\KRTCPSocketServer.pas"/>
+			<DCCReference Include="..\..\Net\KRUDPSocketServer.pas"/>
+			<DCCReference Include="..\..\Common\KRBLEdit.pas"/>
+			<DCCReference Include="..\..\Utils\uLkJSON.pas"/>
+			<DCCReference Include="..\..\Utils\ISO3166.pas"/>
+			<BuildConfiguration Include="Release">
+				<Key>Cfg_2</Key>
+				<CfgParent>Base</CfgParent>
+			</BuildConfiguration>
+			<BuildConfiguration Include="Base">
+				<Key>Base</Key>
+			</BuildConfiguration>
+			<BuildConfiguration Include="Debug">
+				<Key>Cfg_1</Key>
+				<CfgParent>Base</CfgParent>
+			</BuildConfiguration>
+		</ItemGroup>
+		<Import Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')" Project="$(BDS)\Bin\CodeGear.Delphi.Targets"/>
+		<Import Condition="Exists('$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\8.0\UserTools.proj')" Project="$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\8.0\UserTools.proj"/>
+		<ProjectExtensions>
+			<Borland.Personality>Delphi.Personality.12</Borland.Personality>
+			<Borland.ProjectType>Package</Borland.ProjectType>
+			<BorlandProject>
+				<Delphi.Personality>
+					<Source>
+						<Source Name="MainSource">KRCommon.dpk</Source>
+					</Source>
+					<VersionInfo>
+						<VersionInfo Name="IncludeVerInfo">True</VersionInfo>
+						<VersionInfo Name="AutoIncBuild">False</VersionInfo>
+						<VersionInfo Name="MajorVer">1</VersionInfo>
+						<VersionInfo Name="MinorVer">0</VersionInfo>
+						<VersionInfo Name="Release">0</VersionInfo>
+						<VersionInfo Name="Build">0</VersionInfo>
+						<VersionInfo Name="Debug">False</VersionInfo>
+						<VersionInfo Name="PreRelease">False</VersionInfo>
+						<VersionInfo Name="Special">False</VersionInfo>
+						<VersionInfo Name="Private">False</VersionInfo>
+						<VersionInfo Name="DLL">False</VersionInfo>
+						<VersionInfo Name="Locale">1049</VersionInfo>
+						<VersionInfo Name="CodePage">1251</VersionInfo>
+					</VersionInfo>
+					<VersionInfoKeys>
+						<VersionInfoKeys Name="CompanyName"/>
+						<VersionInfoKeys Name="FileDescription"/>
+						<VersionInfoKeys Name="FileVersion">1.0.0.0</VersionInfoKeys>
+						<VersionInfoKeys Name="InternalName"/>
+						<VersionInfoKeys Name="LegalCopyright"/>
+						<VersionInfoKeys Name="LegalTrademarks"/>
+						<VersionInfoKeys Name="OriginalFilename"/>
+						<VersionInfoKeys Name="ProductName"/>
+						<VersionInfoKeys Name="ProductVersion">1.0.0.0</VersionInfoKeys>
+						<VersionInfoKeys Name="Comments"/>
+					</VersionInfoKeys>
+					<Excluded_Packages>
+						<Excluded_Packages Name="C:\Program Files (x86)\FastReport 5 VCL Standard\LibD15\dclfrxIBX15.bpl">FastReport 5.0 IBX Components</Excluded_Packages>
+						<Excluded_Packages Name="C:\Program Files (x86)\FastReport 5 VCL Standard\LibD15\dclfsIBX15.bpl">FastScript 1.9 IBX Components</Excluded_Packages>
+						<Excluded_Packages Name="C:\Users\Public\Documents\RAD Studio\8.0\Bp\JvCmpDesign150.bpl">JVCL Non-Visual Components</Excluded_Packages>
+					</Excluded_Packages>
+				</Delphi.Personality>
+				<Platforms>
+					<Platform value="Win32">True</Platform>
+				</Platforms>
+			</BorlandProject>
+			<ProjectFileVersion>12</ProjectFileVersion>
+		</ProjectExtensions>
+	</Project>

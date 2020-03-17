@@ -1,0 +1,82 @@
+package KRCommon;
+
+{$R *.res}
+{$R '..\..\Common\KRCommon.dcr'}
+{$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
+{$ALIGN 8}
+{$ASSERTIONS ON}
+{$BOOLEVAL OFF}
+{$DEBUGINFO ON}
+{$EXTENDEDSYNTAX ON}
+{$IMPORTEDDATA ON}
+{$IOCHECKS ON}
+{$LOCALSYMBOLS OFF}
+{$LONGSTRINGS ON}
+{$OPENSTRINGS ON}
+{$OPTIMIZATION ON}
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+{$REFERENCEINFO ON}
+{$SAFEDIVIDE OFF}
+{$STACKFRAMES OFF}
+{$TYPEDADDRESS OFF}
+{$VARSTRINGCHECKS ON}
+{$WRITEABLECONST OFF}
+{$MINENUMSIZE 1}
+{$IMAGEBASE $400000}
+{$DEFINE RELEASE}
+{$ENDIF IMPLICITBUILDING}
+{$DESCRIPTION 'KRCommon'}
+{$LIBSUFFIX '170'}
+{$IMPLICITBUILD ON}
+
+requires
+  rtl,
+  designide,
+  IndyCore,
+  IndySystem,
+  IndyProtocols;
+
+contains
+  KRCommonRegister in 'KRCommonRegister.pas',
+  KRBluetooth in '..\..\Common\KRBluetooth.pas',
+  KRBoundLabel in '..\..\Common\KRBoundLabel.pas',
+  KRCheckBox in '..\..\Common\KRCheckBox.pas',
+  KRCheckGroupBox in '..\..\Common\KRCheckGroupBox.pas',
+  KRComboBox in '..\..\Common\KRComboBox.pas',
+  KRComponentCollection in '..\..\Common\KRComponentCollection.pas',
+  KRImageList in '..\..\Common\KRImageList.pas',
+  KRIniConfig in '..\..\Common\KRIniConfig.pas',
+  KRListView in '..\..\Common\KRListView.pas',
+  KRNormalArray in '..\..\Common\KRNormalArray.pas',
+  KRProgressBar in '..\..\Common\KRProgressBar.pas',
+  KRRadioButton in '..\..\Common\KRRadioButton.pas',
+  KRRichEdit in '..\..\Common\KRRichEdit.pas',
+  KRThread in '..\..\Common\KRThread.pas',
+  KRThreadQueue in '..\..\Common\KRThreadQueue.pas',
+  KRTimer in '..\..\Common\KRTimer.pas',
+  KRValueEdit in '..\..\Common\KRValueEdit.pas',
+  KRVersionInfo in '..\..\Common\KRVersionInfo.pas',
+  KRBTSocketClient in '..\..\Net\KRBTSocketClient.pas',
+  KRBTSocketServer in '..\..\Net\KRBTSocketServer.pas',
+  KRParser in '..\..\Net\KRParser.pas',
+  KRParserCfg in '..\..\Net\KRParserCfg.pas',
+  KRSockets in '..\..\Net\KRSockets.pas',
+  KRTCPSocketClient in '..\..\Net\KRTCPSocketClient.pas',
+  KRTCPSocketServer in '..\..\Net\KRTCPSocketServer.pas',
+  funcs in '..\..\Utils\funcs.pas',
+  KRCRC in '..\..\Utils\KRCRC.pas',
+  KRHTMLParseUtils in '..\..\Utils\KRHTMLParseUtils.pas',
+  KRRuntimeErrors in '..\..\Utils\KRRuntimeErrors.pas',
+  KRStreamCoder in '..\..\Utils\KRStreamCoder.pas',
+  KRStrUtils in '..\..\Utils\KRStrUtils.pas',
+  KRTypes in '..\..\Utils\KRTypes.pas',
+  KRWindows in '..\..\Utils\KRWindows.pas',
+  lgop in '..\..\Utils\lgop.pas',
+  md5 in '..\..\Utils\md5.pas',
+  KRBLEdit in '..\..\Common\KRBLEdit.pas',
+  ISO3166 in '..\..\Utils\ISO3166.pas',
+  uLkJSON in '..\..\Utils\uLkJSON.pas',
+  KRUDPSocketServer in '..\..\Net\KRUDPSocketServer.pas';
+
+end.

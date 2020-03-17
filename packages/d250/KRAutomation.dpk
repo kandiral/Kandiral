@@ -1,0 +1,77 @@
+package KRAutomation;
+
+{$R *.res}
+{$R '..\..\Automation\KRAutomation.dcr'}
+{$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
+{$ALIGN 8}
+{$ASSERTIONS ON}
+{$BOOLEVAL OFF}
+{$DEBUGINFO OFF}
+{$EXTENDEDSYNTAX ON}
+{$IMPORTEDDATA ON}
+{$IOCHECKS ON}
+{$LOCALSYMBOLS OFF}
+{$LONGSTRINGS ON}
+{$OPENSTRINGS ON}
+{$OPTIMIZATION ON}
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+{$REFERENCEINFO ON}
+{$SAFEDIVIDE OFF}
+{$STACKFRAMES OFF}
+{$TYPEDADDRESS OFF}
+{$VARSTRINGCHECKS ON}
+{$WRITEABLECONST OFF}
+{$MINENUMSIZE 1}
+{$IMAGEBASE $400000}
+{$DEFINE RELEASE}
+{$ENDIF IMPLICITBUILDING}
+{$DESCRIPTION 'KRAutomation'}
+{$LIBSUFFIX '250'}
+{$IMPLICITBUILD ON}
+
+requires
+  rtl,
+  designide,
+  KRCommon;
+
+contains
+  KRBTConnector in '..\..\Automation\KRBTConnector.pas',
+  KRBtnVarUpdate in '..\..\Automation\KRBtnVarUpdate.pas',
+  KRBTServer in '..\..\Automation\KRBTServer.pas',
+  KRCOMPort in '..\..\Automation\KRCOMPort.pas',
+  KRCOMPortConnector in '..\..\Automation\KRCOMPortConnector.pas',
+  KRCOMPortSets in '..\..\Automation\KRCOMPortSets.pas',
+  KRConnector in '..\..\Automation\KRConnector.pas',
+  KRConnectorQueueBar in '..\..\Automation\KRConnectorQueueBar.pas',
+  KRField in '..\..\Automation\KRField.pas',
+  KRIndicator in '..\..\Automation\KRIndicator.pas',
+  KRMBQueueBar in '..\..\Automation\KRMBQueueBar.pas',
+  KRMBRegIndex in '..\..\Automation\KRMBRegIndex.pas',
+  KRMBRegInterval in '..\..\Automation\KRMBRegInterval.pas',
+  KRMBRegReadFunc in '..\..\Automation\KRMBRegReadFunc.pas',
+  KRMBRegWriteFunc in '..\..\Automation\KRMBRegWriteFunc.pas',
+  KRModbus in '..\..\Automation\KRModbus.pas',
+  KRModbusClient in '..\..\Automation\KRModbusClient.pas',
+  KRModbusMaster in '..\..\Automation\KRModbusMaster.pas',
+  KRModem in '..\..\Automation\KRModem.pas',
+  KRNMEA0183 in '..\..\Automation\KRNMEA0183.pas',
+  KRPlcIO in '..\..\Automation\KRPlcIO.pas',
+  KRServer in '..\..\Automation\KRServer.pas',
+  KRSpeedInfo in '..\..\Automation\KRSpeedInfo.pas',
+  KRTCPConnector in '..\..\Automation\KRTCPConnector.pas',
+  KRTCPServer in '..\..\Automation\KRTCPServer.pas',
+  KRTPClient in '..\..\Automation\KRTPClient.pas',
+  KRTPServer in '..\..\Automation\KRTPServer.pas',
+  KRVariables in '..\..\Automation\KRVariables.pas',
+  KRVarLabel in '..\..\Automation\KRVarLabel.pas',
+  KRVButton in '..\..\Automation\KRVButton.pas',
+  KRVCheckBox in '..\..\Automation\KRVCheckBox.pas',
+  KRVComboBox in '..\..\Automation\KRVComboBox.pas',
+  KRAutomationRegister in 'KRAutomationRegister.pas',
+  KRAsyncComPort in '..\..\Automation\KRAsyncComPort.pas',
+  KRMBMon in '..\..\Automation\KRMBMon.pas',
+  KRMBRegs in '..\..\Automation\KRMBRegs.pas',
+  KRVCheckGroupBox in '..\..\Automation\KRVCheckGroupBox.pas';
+
+end.
