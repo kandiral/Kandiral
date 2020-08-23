@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRTCPConnector                                                            *)
-(*  Ver.: 17.03.2020                                                          *)
+(*  Ver.: 14.07.2020                                                          *)
 (*  https://kandiral.ru/delphi/krtcpconnector.pas.html                        *)
 (*                                                                            *)
 (******************************************************************************)

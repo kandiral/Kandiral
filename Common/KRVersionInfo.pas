@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRVersionInfo                                                             *)
-(*  Ver.: 03.04.2019                                                          *)
+(*  Ver.: 31.07.2020                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -38,6 +38,8 @@ type
   TKRVersionInfo = class(TComponent)
   private
     FVersionInfo: array[0..ord(high(TVersionType))] of string;
+    FFileName: TFileName;
+    procedure SetFileName(const Value: TFileName);
   protected
     function GetCompanyName: string;
     function GetFileDescription: string;
@@ -54,6 +56,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
   published
+    property FileName: TFileName read FFileName write SetFileName;
     property CompanyName: string read GetCompanyName;
     property FileDescription: string read GetFileDescription;
     property FileVersion: string read GetFileVersion;
@@ -70,9 +73,8 @@ implementation
 
 constructor TKRVersionInfo.Create(AOwner: TComponent);
 begin
-
   inherited Create(AOwner);
-  SetVersionInfo;
+  SetFileName(Application.ExeName);
 end;
 
 function TKRVersionInfo.GetCompanyName: string;
@@ -136,9 +138,15 @@ begin
   result := FVersionInfo[ord(VersionType)];
 end;
 
-procedure TKRVersionInfo.SeTVersionInfo;
+procedure TKRVersionInfo.SetFileName(const Value: TFileName);
+begin
+  FFileName := Value;
+  SetVersionInfo;
+end;
+
+procedure TKRVersionInfo.SetVersionInfo;
 var
-  sAppName, sVersionType: string;
+  sVersionType: string;
   i: integer;
   iLenOfValue, iAppSize, buffsize: Cardinal;
   pcBuf, pcValue: PChar;
@@ -147,11 +155,10 @@ var
   temp: integer;
   LangCharSet: string;
 begin
-  sAppName := Application.ExeName;
-  iAppSize := GetFileVersionInfoSize(PChar(sAppName), buffsize);
+  iAppSize := GetFileVersionInfoSize(PChar(FFileName), buffsize);
   if iAppSize > 0 then begin
     pcBuf := AllocMem(iAppSize);
-    GetFileVersionInfo(PChar(sAppName), 0, iAppSize, pcBuf);
+    GetFileVersionInfo(PChar(FFileName), 0, iAppSize, pcBuf);
 
     VerQueryValue(pcBuf,'\VarFileInfo\Translation',Trans,buffsize);
     if buffsize >= 4 then begin
@@ -160,7 +167,7 @@ begin
       LangCharSet:=IntToHex(temp, 4);
       StrLCopy(@temp, pchar(Trans)+1, 1);
       LangCharSet := LangCharSet+IntToHex(temp, 4);
-    end else raise EReadError.Create('Invalid language info in file '+sAppName);
+    end else raise EReadError.Create('Invalid language info in file '+FFileName);
 
 
     for i := 0 to Ord(High(TVersionType)) do

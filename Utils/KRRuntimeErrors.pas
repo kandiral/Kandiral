@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRRuntimeErrors                                                           *)
-(*  Ver.: 07.09.2014                                                          *)
+(*  Ver.: 14.07.2020                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -12,7 +12,7 @@ unit KRRuntimeErrors;
 
 interface
 
-uses SysUtils, SyncObjs;
+uses Classes, SysUtils, SyncObjs;
 
 type
   TKRRuntimeErrorEv=procedure(Sender: TObject; ADescription: String;
@@ -25,10 +25,12 @@ type
     AException: Exception);
 
   procedure REAddLog(AText: String);
+  procedure REAddLogS(AText: String);
 
 var
   KRRuntimeErrorCS: TCriticalSection;
   KRRELogFile: String = '';
+  KRRELogDateFormat: String = 'yyyy-mm-dd hh:nn:ss.zzz';
   KRRELog: String = '';
 
 implementation
@@ -69,9 +71,33 @@ begin
       try
         AssignFile(logFile, KRRELogFile);
         if FileExists(KRRELogFile) then System.Append(logFile) else Rewrite(logFile);
-        Writeln(logFile,FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz    ', NOW)+AText);
+        Writeln(logFile,FormatDateTime(KRRELogDateFormat, NOW)+'    '+AText);
       finally
         CloseFile(logFile);
+      end;
+    except end;
+    RECS_Leave;
+  end;
+end;
+
+procedure REAddLogS(AText: String);
+var
+  fs: TFileStream;
+  s: AnsiString;
+begin
+  if KRRELogFile<>'' then begin
+    RECS_Enter;
+    try
+      if FileExists(KRRELogFile) then begin
+        fs:=TFileStream.Create(KRRELogFile,fmOpenWrite);
+        fs.Seek(0, soFromEnd);
+      end else
+        fs:=TFileStream.Create(KRRELogFile,fmCreate);
+      try
+        s:=AnsiString(FormatDateTime(KRRELogDateFormat, NOW)+'    '+AText)+#$D#$A;
+        fs.WriteBuffer(s[1],Length(s));
+      finally
+        fs.Free;
       end;
     except end;
     RECS_Leave;

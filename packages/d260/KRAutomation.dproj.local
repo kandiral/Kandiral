@@ -8,10 +8,10 @@
     <Transaction>1899.12.30 00:00:00.000.492,=X:\Components\Kandiral\Automation\KRTCPConnector.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.317,=designide.dcp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.720,=X:\Components\Kandiral\Automation\KRVarLabel.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.265,=X:\Components\Kandiral\Automation\KRNMEA0183.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.079,=X:\Components\Kandiral\Automation\KRVCheckGroupBox.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.578,=X:\Components\Kandiral\Automation\KRTPClient.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.437,X:\Components\Kandiral\packages\d260\KRAutomation.dproj=C:\Users\kandiral\Documents\Embarcadero\Studio\Projects\Package1.dproj</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.079,=X:\Components\Kandiral\Automation\KRVCheckGroupBox.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.265,=X:\Components\Kandiral\Automation\KRNMEA0183.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.325,=X:\Components\Kandiral\Automation\KRPlcIO.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.845,=X:\Components\Kandiral\Automation\KRAsyncComPort.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.800,=X:\Components\Kandiral\Automation\KRIndicator.pas</Transaction>

@@ -4,13 +4,15 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRModbus                                                                  *)
-(*  Ver.: 08.10.2019                                                          *)
+(*  Ver.: 23.08.2020                                                          *)
 (*  https://kandiral.ru/delphi/krmodbus.pas.html                              *)
 (*                                                                            *)
 (******************************************************************************)
 unit KRModbus;
 
 interface
+
+{$I '..\Includes\language.inc'}
 
 uses
   {$IF CompilerVersion >= 23}
@@ -41,15 +43,27 @@ const
   MBERR_MEMORY_PARITY_ERROR = TModbusError(8);
 
   MODBUS_ERRORS_MSG : array[0..MB_ERRORS_COUNT-1] of String = (
-     'Нет ошибок.',
-     'Недопустимый номер функции.',
-     'Некорректный адрес.',
-     'Некорректные данные.',
-     'Отказ оборудования прибора.',
-     'Данные не готовы.',
-     'Система занята.',
-     'Отрицательное квитирование.',
-     'Ошибка четности памяти.'
+{$IFDEF RUSSIAN_LANGUAGE}
+     'Нет ошибок',
+     'Недопустимый номер функции',
+     'Некорректный адрес регистра',
+     'Некорректные данные',
+     'Отказ оборудования прибора',
+     'Данные не готовы',
+     'Система занята',
+     'Отрицательное подтверждение',
+     'Ошибка четности памяти'
+{$ELSE}
+     'No errors',
+     'Invalid function number',
+     'Invalid register address',
+     'Invalid data',
+     'Instrument hardware failure',
+     'Data not ready',
+     'System busy',
+     'Negative acknowledgment',
+     'Memory parity error'
+{$ENDIF}
   );
 
   mbfReadCoils = TMBFunc($01);

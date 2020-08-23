@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRIniConfig                                                               *)
-(*  Ver.: 16.09.2019                                                          *)
+(*  Ver.: 14.07.2020                                                          *)
 (*  https://kandiral.ru/delphi/kriniconfig.pas.html                           *)
 (*                                                                            *)
 (******************************************************************************)

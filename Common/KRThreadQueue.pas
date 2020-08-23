@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRThreadQueue                                                             *)
-(*  Ver.: 31.08.2017                                                          *)
+(*  Ver.: 14.07.2020                                                          *)
 (*  https://kandiral.ru/delphi/krthreadqueue.pas.html                         *)
 (*                                                                            *)
 (******************************************************************************)

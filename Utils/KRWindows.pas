@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRWindows                                                                 *)
-(*  Ver.: 03.04.2019                                                          *)
+(*  Ver.: 14.07.2020                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -177,7 +177,7 @@ end;
 
 function KRCmd(ACmd: String): String;overload;
 begin
-  Result:=KRCmd(ACmd,255);
+  Result:=KRCmd(ACmd,0);
 end;
 
 function KRCmd(ACmd: String; ATimeout: Byte): String;overload;
@@ -244,7 +244,7 @@ begin
   repeat
     i := WaitForSingleObject(pi.hProcess,100);
     if i = WAIT_OBJECT_0 then break;
-    if (Now-TmStart)*SecsPerDay>ATimeout then break;
+    if(ATimeout>0)and((Now-TmStart)*SecsPerDay>ATimeout)then break;
     if Assigned(Application) then Application.ProcessMessages else Sleep(20);
   until false;
 
@@ -373,7 +373,7 @@ begin
     if isOem then OemToAnsi(PAnsiChar(StdErrors),PAnsiChar(StdErrors));
     AStdErr:=AStdErr+StringToWideString(StdErrors,1251);
     if i = WAIT_OBJECT_0 then break;
-    if (Now-TmStart)*SecsPerDay>ATimeout then break;
+    if(ATimeout>0)and((Now-TmStart)*SecsPerDay>ATimeout)then break;
   until false;
 
   i := WaitForSingleObject(pi.hProcess,100);

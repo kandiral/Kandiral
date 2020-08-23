@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRComponentCollection                                                     *)
-(*  Ver.: 16.09.2019                                                          *)
+(*  Ver.: 14.07.2020                                                          *)
 (*  https://kandiral.ru/delphi/krcomponentcollection.pas.html                 *)
 (*                                                                            *)
 (******************************************************************************)

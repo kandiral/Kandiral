@@ -4,13 +4,15 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRModbusMaster                                                            *)
-(*  Ver.: 17.03.2020                                                          *)
+(*  Ver.: 23.08.2020                                                          *)
 (*  https://kandiral.ru/delphi/krmodbusmaster.pas.html                        *)
 (*                                                                            *)
 (******************************************************************************)
 unit KRModbusMaster;
 
 interface
+
+{$I '..\Includes\language.inc'}
 
 uses
   {$IF CompilerVersion >= 23}
@@ -42,19 +44,35 @@ const
   mbmeClientNotActive = TMBMError(12);
 
   MB_PARSER_ERRORS_MSG : array[0..MBM_ERRORS_COUNT] of String = (
-    'Нет ошибок.',
-    'Не подключен модуль передачи данных.',
-    'Неверный идентификатор пакета.',
-    'Неверная длинна пакета.',
-    'Ошибка контрольной суммы.',
-    'Неверный номер функции.',
-    'Неверная длинна Modbus пакета.',
-    'Неверная длинна данных.',
-    'Очередь переполнена.',
-    'Таймаут.',
-    'Ошибка времени выполнения.',
-    'Обработчик протокола Modbus выключен.',
-    'Modbus клиент выключен.'
+{$IFDEF RUSSIAN_LANGUAGE}
+    'Нет ошибок',
+    'Не подключен модуль передачи данных',
+    'Неверный идентификатор пакета',
+    'Неверная длина пакета',
+    'Ошибка контрольной суммы',
+    'Неверный номер функции',
+    'Неверная длина Modbus пакета',
+    'Неверная длина данных',
+    'Очередь переполнена',
+    'Таймаут',
+    'Ошибка времени выполнения',
+    'Обработчик протокола Modbus выключен',
+    'Modbus клиент отключен'
+{$ELSE}
+    'No errors',
+    'Communication module not connected',
+    'Invalid package ID',
+    'Invalid packet length',
+    'Checksum error',
+    'Invalid function number',
+    'Invalid Modbus packet length',
+    'Invalid data length',
+    'Queue is overflow',
+    'Timeout',
+    'Runtime error',
+    'Modbus protocol handler disabled',
+    'Modbus client disabled'
+{$ENDIF}
   );
 
   //------ Modbus Master Functions ---------------------------------------------

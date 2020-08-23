@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  funcs                                                                     *)
-(*  Ver.: 22.10.2017                                                          *)
+(*  Ver.: 14.07.2020                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -34,6 +34,7 @@ type
   function Explode(const delim, str: string): TStringList;
   function Implode(const delim: String; strlist: TStrings): String;
   procedure SortArray(_array: TIntArray; _desc: boolean = false);
+  procedure SortStrings(AStrings: TStrings; _desc: boolean = false);
   function TimeSToStr(t:real):string;
   function MAKEBYTE(a,b:byte):byte;
   function decdt(d: TDateTime): integer;
@@ -962,6 +963,22 @@ begin
         v:=_array[j];
         _array[j]:=_array[j-1];
         _array[j-1]:=v;
+      end;
+end;
+
+procedure SortStrings(AStrings: TStrings; _desc: boolean = false);
+var
+  i, j, _size : integer;
+  v: String;
+begin
+  _size:=AStrings.Count;
+  for i:=1 to _size-1 do
+    for j:=_size-1 downto i do
+      if(_desc and({$IF CompilerVersion >= 23}System.{$IFEND}SysUtils.CompareText(AStrings[j-1],AStrings[j])<0))or
+      (not _desc and({$IF CompilerVersion >= 23}System.{$IFEND}SysUtils.CompareText(AStrings[j-1],AStrings[j])>0))then begin
+        v:=AStrings[j];
+        AStrings[j]:=AStrings[j-1];
+        AStrings[j-1]:=v;
       end;
 end;
 

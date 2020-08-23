@@ -4,13 +4,15 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRModbusClient                                                            *)
-(*  Ver.: 20.11.2019                                                          *)
+(*  Ver.: 23.08.2020                                                          *)
 (*  https://kandiral.ru/delphi/krmodbusclient.pas.html                        *)
 (*                                                                            *)
 (******************************************************************************)
 unit KRModbusClient;
 
 interface
+
+{$I '..\Includes\language.inc'}
 
 uses
   {$IF CompilerVersion >= 23}
@@ -37,6 +39,7 @@ const
   mbceFileWriteError = TMBCError(65542);
 
   MBC_ERRORS_MSG : array[0..MBC_ERRORS_COUNT-1] of String = (
+{$IFDEF RUSSIAN_LANGUAGE}
     'Превышен лимит ожидания ответа от потока',
     'Файл не найден',
     'Не удалось удалить файл',
@@ -44,6 +47,15 @@ const
     'Ошибка чтения файла',
     'Не удается открыть файл для записи',
     'Ошибка записи в файла'
+{$ELSE}
+    'Timeout receive response from the thread',
+    'File not found',
+    'Failed to delete file',
+    'Can''t open file for reading',
+    'File read error',
+    'Can''t open file for writing',
+    'Error writing to file'
+{$ENDIF}
   );
 
 type

@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRField                                                                   *)
-(*  Ver.: 27.10.2019                                                          *)
+(*  Ver.: 14.07.2020                                                          *)
 (*  https://kandiral.ru/delphi/krfield.pas.html                               *)
 (*                                                                            *)
 (******************************************************************************)
@@ -367,8 +367,8 @@ begin
         VT_SINGLE: begin
           s:=Trim(inherited Text);
           if FormatSettings.DecimalSeparator=#44
-          then ReplaceStr(s,'.',FormatSettings.DecimalSeparator)
-          else ReplaceStr(s,',',FormatSettings.DecimalSeparator);
+          then s:=ReplaceStr(s,'.',FormatSettings.DecimalSeparator)
+          else s:=ReplaceStr(s,',',FormatSettings.DecimalSeparator);
           if TextToFloat(PChar(S), ext, fvExtended, FormatSettings) then begin
             sg:=ext;
             if(sg<FInputMin)then st:=2 else
@@ -382,8 +382,8 @@ begin
         VT_DOUBLE: begin
           s:=Trim(inherited Text);
           if FormatSettings.DecimalSeparator=#44
-          then ReplaceStr(s,'.',FormatSettings.DecimalSeparator)
-          else ReplaceStr(s,',',FormatSettings.DecimalSeparator);
+          then s:=ReplaceStr(s,'.',FormatSettings.DecimalSeparator)
+          else s:=ReplaceStr(s,',',FormatSettings.DecimalSeparator);
           if TextToFloat(PChar(S), ext, fvExtended, FormatSettings) then begin
             db:=ext;
             if(db<FInputMin)then st:=2 else

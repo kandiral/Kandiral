@@ -4,13 +4,15 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRConnector                                                               *)
-(*  Ver.: 17.03.2020                                                          *)
+(*  Ver.: 23.08.2020                                                          *)
 (*  https://kandiral.ru/delphi/krconnector.pas.html                           *)
 (*                                                                            *)
 (******************************************************************************)
 unit KRConnector;
 
 interface
+
+{$I '..\Includes\language.inc'}
 
 uses
   {$IF CompilerVersion >= 23}
@@ -38,14 +40,25 @@ const
   ceNotActive = TKRConnectorError(7);
 
   CONNECTOR_ERRORS_MSG : array[0..CE_ERRORS_COUNT-1] of String = (
-    'Нет ошибок.',
-    'Очередь коннектора переполнена.',
-    'Соединение не установлено.',
-    'Не удалось отправить данные.',
-    'Ответ не получен.',
-    'Истекло время ожидания при отправке данных.',
-    'Истекло время ожидания при получении данных.',
-    'Соединение не активно.'
+{$IFDEF RUSSIAN_LANGUAGE}
+    'Нет ошибок',
+    'Очередь коннектора переполнена',
+    'Соединение не установлено',
+    'Не удалось отправить данные',
+    'Ответ не получен',
+    'Истекло время ожидания отправки данных',
+    'Истекло время ожидания получения ответа',
+    'Соединение не активно'
+{$ELSE}
+    'No errors',
+    'Connector queue overflow',
+    'Connection not set',
+    'Failed to send data',
+    'No response received',
+    'Sending data timeout',
+    'Response receiving timeout',
+    'Connection not active'
+{$ENDIF}
   );
 
 type
