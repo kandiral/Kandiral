@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRValueEdit                                                               *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 06.01.2020                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -16,12 +16,12 @@ uses
   {$IF CompilerVersion >= 23}
     Winapi.Windows, System.Classes, Vcl.Controls, Vcl.ExtCtrls, Vcl.StdCtrls,
     Vcl.Graphics, System.SysUtils, Winapi.Messages, Vcl.Forms, System.StrUtils,
-    System.Variants,
+    System.Variants, System.Math,
   {$ELSE}
     Windows, Classes, Controls, ExtCtrls, StdCtrls, Graphics, SysUtils, Messages,
-    Forms, StrUtils, Variants,
+    Forms, StrUtils, Variants, Math,
   {$IFEND}
-    KRIniConfig, KRBoundLabel;
+    KRValueEditLng, KRIniConfig, KRBoundLabel, KRMsgBox, KRVariants;
 
 type
 
@@ -49,6 +49,10 @@ type
     FEnterVal: TNotifyEvent;
     FEnterAftExit: boolean;
     FSetByOk: boolean;
+    FMsgMaximumLimit: String;
+    FMsgMinimumLimit: String;
+    FMsgAskBeforeInput: String;
+    FMsgIncorrectValue: String;
     procedure SetChangeFontColor(const Value: TColor);
     procedure SetColor(const Value: TColor);
     procedure SetErrorFontColor(const Value: TColor);
@@ -89,6 +93,10 @@ type
     property Value: Variant read FValue write SetValue;
     property EnterAftExit: boolean read FEnterAftExit write FEnterAftExit default false;
     property SetByOk: boolean read FSetByOk write FSetByOk default false;
+    property MsgMaximumLimit: String read FMsgMaximumLimit write FMsgMaximumLimit;
+    property MsgMinimumLimit: String read FMsgMinimumLimit write FMsgMinimumLimit;
+    property MsgAskBeforeInput: String read FMsgAskBeforeInput write FMsgAskBeforeInput;
+    property MsgIncorrectValue: String read FMsgIncorrectValue write FMsgIncorrectValue;
     property Align;
     property Alignment;
     property Anchors;
@@ -178,15 +186,7 @@ type
     property BLabel: TKRBoundLabel read FLabel;
   end;
 
-var
-  KRVEMsgMaximumLimit: String;
-  KRVEMsgMinimumLimit: String;
-  KRVEMsgAskBeforeInput: String;
-  KRVEMsgIncorrectValue: String;
-
 implementation
-
-uses Funcs, lgop;
 
 { TKRValueEdit }
 
@@ -215,6 +215,12 @@ begin
   FChangeFontColor:=clTeal;
   FEnterAftExit:=false;
   FSetByOk:=false;
+
+  FMsgMaximumLimit:=KRVALUEEDIT_DEFAULT_MAXIMUMLIMIT_MSG;
+  FMsgMinimumLimit:=KRVALUEEDIT_DEFAULT_MINIMUMLIMIT_MSG;
+  FMsgAskBeforeInput:=KRVALUEEDIT_DEFAULT_ASKBEFOREINPUT_MSG;
+  FMsgIncorrectValue:=KRVALUEEDIT_DEFAULT_INCORRECTVALUE_MSG;
+
   inherited OnKeyPress:=DoKeyPress;
   inherited OnEnter:=DoEnter_;
   inherited OnClick:=DoClick;
@@ -261,33 +267,34 @@ begin
       vtInteger: if(Assigned(FCfgParam))and(FCfgParam.ValueType=icvtBool)then begin
       end else begin
         s:=Trim(inherited Text);
-        if(Length(s)>0)and(LowerCase(s[Length(s)])='h')then begin
-          n:=HexToInt(LeftStr(s,Length(s)-1));
-          e:=0;
-        end else Val(s,n,e);
-        if e<>0 then st:=1 else
-        if(n<FInputMin)then st:=2 else
-        if(n>FInputMax)then st:=3 else
-        _val:=Word(n);
-        sval:=IntToStr(_val);
+        if(Length(s)>0)and(LowerCase(s[Length(s)])='h')then
+          s:='$'+LeftStr(s,Length(s)-1);
+        Val(s,n,e);
+        if e<>0 then st:=1 else begin
+          _val:=n;
+          sval:=IntToStr(_val);
+          if(n<FInputMin)then st:=2 else
+          if(n>FInputMax)then st:=3;
+        end;
       end;
       vtFloat: begin
         s:=Trim(inherited Text);
         if FormatSettings.DecimalSeparator=#44
         then s:=ReplaceStr(s,'.',FormatSettings.DecimalSeparator)
         else s:=ReplaceStr(s,',',FormatSettings.DecimalSeparator);
-        if not TextToFloat(PChar(S), fl, fvExtended, FormatSettings) then st:=1 else
-        if(fl<FInputMin)then st:=2 else
-        if(fl>FInputMax)then st:=3 else
-        _val:=fl;
-        if FFormat='' then sval:=FloatToStr(_val)
-        else sval:=FormatFloat(FFormat,_val);
+        if not TextToFloat(PChar(S), fl, fvExtended, FormatSettings) then st:=1 else begin
+          _val:=fl;
+          if FFormat='' then sval:=FloatToStr(_val)
+          else sval:=FormatFloat(FFormat,_val);
+          if(fl<FInputMin)then st:=2 else
+          if(fl>FInputMax)then st:=3;
+        end;
       end;
     end;
     case st of
       0: if FAskBeforeInput then begin
         FAsk:=true;
-        if AppMsgBox(ReplaceStr(KRVEMsgAskBeforeInput,'[#Value]',sval),MB_YESNOCANCEL or MB_ICONQUESTION)=IDYES then begin
+        if KRAppMsgBox(ReplaceStr(FMsgAskBeforeInput,'[#Value]',sval),MB_YESNOCANCEL or MB_ICONQUESTION)=IDYES then begin
           if Assigned(FCfgParam)and(not FSetByOk)then FCfgParam.Value:=_val else SetValue(_val);
           if Assigned(FEnterVal) then FEnterVal(Self);
         end;
@@ -296,16 +303,16 @@ begin
         if Assigned(FCfgParam)and(not FSetByOk)then FCfgParam.Value:=_val else SetValue(_val);
         if Assigned(FEnterVal) then FEnterVal(Self);
       end;
-      1: AppMsgBox(ReplaceStr(KRVEMsgIncorrectValue,'[#Value]',sval),MB_OKCANCEL or MB_ICONERROR);
+      1: KRAppMsgBox(ReplaceStr(FMsgIncorrectValue,'[#Value]',sval),MB_OKCANCEL or MB_ICONERROR);
       2: begin
         if FValueType=vtInteger then s:=IntToStr(FInputMin) else
           if FFormat='' then s:=FloatToStr(FInputMin) else s:=FormatFloat(FFormat,FInputMin);
-        AppMsgBox(ReplaceStr(KRVEMsgMinimumLimit,'[#Value]',s),MB_OKCANCEL or MB_ICONERROR);
+        KRAppMsgBox(ReplaceStr(FMsgMinimumLimit,'[#Value]',s),MB_OKCANCEL or MB_ICONERROR);
       end;
       3: begin
         if FValueType=vtInteger then s:=IntToStr(FInputMax) else
           if FFormat='' then s:=FloatToStr(FInputMax) else s:=FormatFloat(FFormat,FInputMax);
-        AppMsgBox(ReplaceStr(KRVEMsgMaximumLimit,'[#Value]',s),MB_OKCANCEL or MB_ICONERROR);
+        KRAppMsgBox(ReplaceStr(FMsgMaximumLimit,'[#Value]',s),MB_OKCANCEL or MB_ICONERROR);
       end;
     end;
   end;
@@ -418,7 +425,7 @@ var
   Form: TCustomForm;
   s: string;
 begin
-  if(not IsVariantsEqual(FValue,Value))then begin
+  if(not KRVarIsEqually(FValue,Value))then begin
     FValue := Value;
     if Assigned(FChange) then FChange(Self);
   end;
@@ -540,11 +547,5 @@ begin
   FLabel:=TKRBoundLabel.Create(Self);
   FLabel.FreeNotification(Self);
 end;
-
-initialization
-  KRVEMsgMaximumLimit:='Значение не должно быть больше [#Value]';
-  KRVEMsgMinimumLimit:='Значение не должно быть меньше [#Value]';
-  KRVEMsgAskBeforeInput:='Установить значение «[#Value]»?';
-  KRVEMsgIncorrectValue:='Неверно введено значение!';
 
 end.

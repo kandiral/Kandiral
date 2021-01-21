@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRBTSocketServer                                                          *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 15.04.2019                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -14,11 +14,16 @@ interface
 
 uses
   {$IF CompilerVersion >= 23}
-    System.SysUtils,
+    {$IF CompilerVersion >= 28}Winapi.Bluetooth, {$IFEND}Winapi.Winsock2, System.SysUtils,
   {$ELSE}
-    SysUtils,
+    Winsock2, SysUtils,
   {$IFEND}
-  KRSockets, JwaWinsock2, JwaWs2Bth;
+  KRSockets
+
+{$IF CompilerVersion <= 27}
+  , JwaWs2Bth
+{$IFEND}
+;
 
 type
   TKRBTSocketServer = class;
@@ -69,7 +74,7 @@ begin
   len := sizeof(addr);
   Fillchar(addr, sizeof(addr), 0);
   try
-    Sock := ErrorCheck(JwaWinSock2.accept(FSocket, @addr, @len));
+    Sock := ErrorCheck({$IF CompilerVersion >= 23}Winapi.{$IFEND}Winsock2.accept(FSocket, @addr, @len));
   except
     Sock := INVALID_SOCKET;
   end;
@@ -89,21 +94,20 @@ end;
 
 procedure TKRBTSocketServer.Open;
 var
-  addr: SOCKADDR_BTH;
+  addr: TSockAddr;
   AddrSize: Cardinal;
 begin
   inherited;
   if Active and not FConnected then begin
     AddrSize := SizeOf(Addr);
     FillChar(Addr, AddrSize, 0);
-    addr.addressFamily := AF_BTH;
-    addr.btAddr := 0;
-    addr.port := FPort;
-    addr.serviceClassId := StringToGUID('{00001101-0000-1000-8000-00805F9B34FB}');
-    if ErrorCheck(JwaWinSock2.bind(FSocket, @addr, sizeof(addr))) = 0 then
-      FConnected:=ErrorCheck(JwaWinSock2.listen(FSocket, SOMAXCONN)) = 0;
+    PSOCKADDR_BTH(@addr).addressFamily := AF_BTH;
+    PSOCKADDR_BTH(@addr).btAddr := 0;
+    PSOCKADDR_BTH(@addr).port := FPort;
+    PSOCKADDR_BTH(@addr).serviceClassId := StringToGUID('{00001101-0000-1000-8000-00805F9B34FB}');
+    if ErrorCheck(bind(FSocket, addr, sizeof(addr))) = 0 then
+      FConnected:=ErrorCheck(listen(FSocket, SOMAXCONN)) = 0;
   end;
-
 end;
 
 end.

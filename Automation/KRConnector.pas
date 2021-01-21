@@ -12,54 +12,16 @@ unit KRConnector;
 
 interface
 
-{$I '..\Includes\language.inc'}
-
 uses
   {$IF CompilerVersion >= 23}
-    WinApi.Windows, System.Classes, System.SysUtils,
+    WinApi.Windows, System.Classes, System.SysUtils, System.SyncObjs,
   {$ELSE}
-    Windows, Classes, SysUtils,
+    Windows, Classes, SysUtils, SyncObjs,
   {$IFEND}
-  KRTypes, KRSpeedInfo, KRRuntimeErrors, KRThread, KRThreadQueue;
-
-type
-  TKRConnectorError = integer;
+  KRConnectorLng, KRTypes, KRSpeedInfo, KRRuntimeErrors, KRThreadEvent;
 
 const
   CE_QUEUE_MAX_ITEMS = 255;
-
-  CE_ERRORS_COUNT = 8;
-
-  ceOK = TKRConnectorError(0);
-  ceQueueOverflowed = TKRConnectorError(1);
-  ceNotConnection = TKRConnectorError(2);
-  ceDataNotSended = TKRConnectorError(3);
-  ceNoResponse = TKRConnectorError(4);
-  ceRequestTimeout = TKRConnectorError(5);
-  ceResponseTimeout = TKRConnectorError(6);
-  ceNotActive = TKRConnectorError(7);
-
-  CONNECTOR_ERRORS_MSG : array[0..CE_ERRORS_COUNT-1] of String = (
-{$IFDEF RUSSIAN_LANGUAGE}
-    'Нет ошибок',
-    'Очередь коннектора переполнена',
-    'Соединение не установлено',
-    'Не удалось отправить данные',
-    'Ответ не получен',
-    'Истекло время ожидания отправки данных',
-    'Истекло время ожидания получения ответа',
-    'Соединение не активно'
-{$ELSE}
-    'No errors',
-    'Connector queue overflow',
-    'Connection not set',
-    'Failed to send data',
-    'No response received',
-    'Sending data timeout',
-    'Response receiving timeout',
-    'Connection not active'
-{$ENDIF}
-  );
 
 type
 
@@ -75,9 +37,7 @@ type
   TKRConnectorPack = record
     WaitResult: boolean;
     Length, RLen: integer;
-    DelimiterLen: integer;
     Error: integer;
-    Delimiter: Cardinal;
     Pack: PKRBuffer;
     pData: Pointer;
     CallBack: TKRConnectorCallBack;
@@ -89,6 +49,7 @@ type
 
   TKRConnector = class(TComponent, IKRSpeedInfo)
   private
+    CS: TCriticalSection;
     FThreadOut: TKRConnectorThreadOut;
     FOnRecv: TKRConnectorPackEv;
     FOnSend: TKRConnectorPackEv;
@@ -97,51 +58,36 @@ type
     FRuntimeErrorEv: TKRRuntimeErrorEv;
     FCountErrorsForReconnect: integer;
     FConnectionStatus: TKRConnectorStatEv;
+    FInterval: cardinal;
+    FInPackEvent, FOutPackEvent: THandle;
+    FList: array[0..CE_QUEUE_MAX_ITEMS-1] of Pointer;
+    FListPosIn, FListPosOut, FListCount: integer;
     function GetQueueCount: integer;
-    function GetReadTimeout: Cardinal;
-    function GetReconnectTime: Cardinal;
-    function GetWriteTimeout: Cardinal;
-    procedure SetReadTimeout(const Value: Cardinal);
-    procedure SetReconnectTime(const Value: Cardinal);
-    procedure SetWriteTimeout(const Value: Cardinal);
-    function GetConnectTimeout: Cardinal;
-    procedure SetConnectTimeout(const Value: Cardinal);
     function GetLastConnectTime: Cardinal;
     function GetQueueOutCount: integer;
     function GetRuntimeErrorEv: TKRRuntimeErrorEv;
     procedure SetRuntimeErrorEv(const Value: TKRRuntimeErrorEv);
     function GetActive: boolean;
     procedure SetActive(const Value: boolean);
-    function GetWaitPauseTime: Cardinal;
-    function GetWaitTime: Cardinal;
-    procedure SetWaitPauseTime(const Value: Cardinal);
-    procedure SetWaitTime(const Value: Cardinal);
-    function GetWaitOutTime: Cardinal;
-    function GetWaitPauseOutTime: Cardinal;
-    procedure SetWaitOutTime(const Value: Cardinal);
-    procedure SetWaitPauseOutTime(const Value: Cardinal);
-    function GetWaitRespTime: Cardinal;
-    procedure SetWaitRespTime(const Value: Cardinal);
-    function GetStat: TKRConnectorStat;
   protected
     FConnectorType: TKRConnectorType;
     FThread: TKRConnectorThread;
-    FQueue: TKRThreadQueue;
-    FQueueOut: TKRThreadQueue;
+    FReconnectTime: Cardinal;
+    FStat: TKRConnectorStat;
     function GetConnected: boolean;virtual;
+    procedure CreateThread; virtual;
   public
     constructor Create(AOwner: TComponent);override;
     destructor Destroy;override;
     procedure DoRuntimeError(ADesc: String; E: Exception);
     function GetCounter: Cardinal; stdcall;
     procedure Send(APack: PKRBuffer; ALength: integer; ACallBack: TKRConnectorCallBack;
-      AData: Pointer = nil; AWaitResult: boolean = true; ARecvLen: integer = 0;
-      ADelimiter: Cardinal = 0; ADelimiterLen: integer = 0);
+      AData: Pointer = nil; AWaitResult: boolean = true; ARecvLen: integer = 0);
     function ErrorMsg(AError: TKRConnectorError): String;
     property Active: boolean read GetActive write SetActive;
     property QueueCount: integer read GetQueueCount;
     property QueueOutCount: integer read GetQueueOutCount;
-    property Stat: TKRConnectorStat read GetStat;
+    property Stat: TKRConnectorStat read FStat;
     property LastConnectTime: Cardinal read GetLastConnectTime;
     property ConnectorType: TKRConnectorType read FConnectorType;
     property Connected: boolean read GetConnected;
@@ -151,57 +97,49 @@ type
     property OnSendAsync: TKRConnectorPackEv read FOnSendAsync write FOnSendAsync;
     property OnRecvAsync: TKRConnectorPackEv read FOnRecvAsync write FOnRecvAsync;
     property OnConnectionStatus: TKRConnectorStatEv read FConnectionStatus write FConnectionStatus;
-    property ReadTimeout: Cardinal read GetReadTimeout write SetReadTimeout default 100;
-    property WriteTimeout: Cardinal read GetWriteTimeout write SetWriteTimeout default 100;
-    property WaitRespTime: Cardinal read GetWaitRespTime write SetWaitRespTime default 5;
     property CountErrorsForReconnect: integer read FCountErrorsForReconnect write FCountErrorsForReconnect default 3;
-    property ConnectTimeout: Cardinal read GetConnectTimeout write SetConnectTimeout default 1000;
-    property ReconnectTime: Cardinal read GetReconnectTime write SetReconnectTime default 5000;
+    property ReconnectTime: Cardinal read FReconnectTime write FReconnectTime default 5000;
+    property Interval: cardinal read FInterval write FInterval default 5;
     property OnRuntimeError: TKRRuntimeErrorEv read GetRuntimeErrorEv write SetRuntimeErrorEv;
-    property WaitTime: Cardinal read GetWaitTime write SetWaitTime default 20;
-    property WaitPauseTime: Cardinal read GetWaitPauseTime write SetWaitPauseTime default 1000;
-    property WaitOutTime: Cardinal read GetWaitOutTime write SetWaitOutTime default 20;
-    property WaitPauseOutTime: Cardinal read GetWaitPauseOutTime write SetWaitPauseOutTime default 1000;
   end;
 
-  TKRConnectorThread = class(TKRThread)
+  TKRConnectorThread = class(TKRThreadEvent)
   private
     FLastStatusSendTm: Cardinal;
     procedure SendPackAsync;
     procedure RecvPackAsync;
   protected
-    FStat: TKRConnectorStat;
     FCounter: cardinal;
-    FQueue: TKRThreadQueue;
-    FQueueOut: TKRThreadQueue;
     FConnector: TKRConnector;
-    FPK: PKRConnectorPack;
-    FWaitRespTime: Cardinal;
+    FInterval: cardinal;
     FReconnectTime, FLastConnectTime: Cardinal;
-    FReadTimeout, FWriteTimeout, FConnectTimeout: Cardinal;
+    FPk: PKRConnectorPack;
     procedure DoCallBack;
     procedure SendPack;
     procedure RecvPack;
-    procedure _exec;virtual;
+    procedure _exec;virtual;abstract;
     procedure KRExecute; override;
-    procedure KRExecutePaused; override;
-    procedure KRExecutePausedFirst; override;
+    procedure KRExecuteFirst; override;
+    procedure KRExecuteLast; override;
     procedure SetStat(AStat: TKRConnectorStat);
     procedure Status;
   public
-    constructor CreateTh(AConnector: TKRConnector; AQueue: TKRThreadQueue;
-      AQueueOut: TKRThreadQueue);overload;
-    property WaitRespTime: Cardinal read FWaitRespTime write FWaitRespTime;
+    constructor CreateTh(AConnector: TKRConnector);
   end;
 
-  TKRConnectorThreadOut = class(TKRThread)
+  TKRConnectorThreadOut = class(TKRThreadEvent)
   private
+    CS: TCriticalSection;
     FConnector: TKRConnector;
-    FQueueOut: TKRThreadQueue;
+    FOutPackEvent: THandle;
+    FList: array[0..CE_QUEUE_MAX_ITEMS-1] of Pointer;
+    FListPosIn, FListPosOut, FListCount: integer;
   protected
     procedure KRExecute; override;
+    procedure KRExecuteLast; override;
   public
-    constructor CreateTh(AConnector: TKRConnector; AQueueOut: TKRThreadQueue);
+    constructor CreateTh(AConnector: TKRConnector; AOutPackEvent: THandle);
+    procedure push(p: PKRConnectorPack);
   end;
 
 implementation
@@ -211,17 +149,37 @@ implementation
 constructor TKRConnector.Create(AOwner: TComponent);
 begin
   inherited;
+  FStat:=cstNotActive;
+  FReconnectTime:=5000;
   FCountErrorsForReconnect:=3;
-  FQueue:=TKRThreadQueue.Create;
-  FQueueOut:=TKRThreadQueue.Create;
-  FThreadOut:=TKRConnectorThreadOut.CreateTh(Self,FQueueOut);
+  FInterval:=5;
+  FListPosIn:=0;
+  FListPosOut:=0;
+  FListCount:=0;
+
+  CS:=TCriticalSection.Create;
+  FInPackEvent:=CreateEvent(nil, true, false, nil);
+  FOutPackEvent:=CreateEvent(nil, true, false, nil);
+  FThreadOut:=TKRConnectorThreadOut.CreateTh(Self, FOutPackEvent);
+end;
+
+procedure TKRConnector.CreateThread;
+begin
+  FThread.FReconnectTime:=FReconnectTime;
+  FThread.FInterval:=FInterval;
+  FThread.FLastConnectTime:=getTickCount-FReconnectTime-1;
 end;
 
 destructor TKRConnector.Destroy;
 begin
+  SetActive(false);
+
   FThreadOut.Free;
-  FQueue.Free;
-  FQueueOut.Free;
+  CloseHandle(FOutPackEvent);
+
+  CS.Free;
+
+  CloseHandle(FInPackEvent);
   inherited;
 end;
 
@@ -239,7 +197,12 @@ end;
 
 function TKRConnector.GetActive: boolean;
 begin
-  Result:=FThread.Active and FThreadOut.Active;
+  CS.Enter;
+  try
+    Result:=Assigned(FThread);
+  finally
+    CS.Leave;
+  end;
 end;
 
 function TKRConnector.GetConnected: boolean;
@@ -247,29 +210,16 @@ begin
   Result:=false;
 end;
 
-function TKRConnector.GetConnectTimeout: Cardinal;
-begin
-  Result:=FThread.FConnectTimeout;
-end;
-
 function TKRConnector.GetCounter: Cardinal;
 begin
-  Result:=FThread.FCounter;
+  if FThread=nil then result:=0
+  else Result:=FThread.FCounter;
 end;
 
 function TKRConnector.GetLastConnectTime: Cardinal;
 begin
-  result:=FThread.FLastConnectTime
-end;
-
-function TKRConnector.GetReadTimeout: Cardinal;
-begin
-  Result:=FThread.FReadTimeout;
-end;
-
-function TKRConnector.GetReconnectTime: Cardinal;
-begin
-  Result:=FThread.FReconnectTime;
+  if FThread=nil then result:=0
+  else result:=FThread.FLastConnectTime
 end;
 
 function TKRConnector.GetRuntimeErrorEv: TKRRuntimeErrorEv;
@@ -279,92 +229,85 @@ begin
   RECS_Leave;
 end;
 
-function TKRConnector.GetStat: TKRConnectorStat;
-begin
-  Result:=FThread.FStat;
-end;
-
 function TKRConnector.GetQueueCount: integer;
 begin
-  Result:=FQueue.Count;
+  Result:=FListCount;
 end;
 
 function TKRConnector.GetQueueOutCount: integer;
 begin
-  Result:=FQueueOut.Count;
-end;
-
-function TKRConnector.GetWaitOutTime: Cardinal;
-begin
-  Result:=FThreadOut.WaitTime;
-end;
-
-function TKRConnector.GetWaitPauseOutTime: Cardinal;
-begin
-  Result:=FThreadOut.WaitPauseTime;
-end;
-
-function TKRConnector.GetWaitPauseTime: Cardinal;
-begin
-  Result:=FThread.WaitPauseTime;
-end;
-
-function TKRConnector.GetWaitRespTime: Cardinal;
-begin
-  Result:=FThread.WaitRespTime;
-end;
-
-function TKRConnector.GetWaitTime: Cardinal;
-begin
-  Result:=FThread.WaitTime;
-end;
-
-function TKRConnector.GetWriteTimeout: Cardinal;
-begin
-  Result:=FThread.FWriteTimeout;
+  Result:=FThreadOut.FListCount;
 end;
 
 procedure TKRConnector.Send(APack: PKRBuffer; ALength: integer;
       ACallBack: TKRConnectorCallBack; AData: Pointer = nil; AWaitResult: boolean = true;
-      ARecvLen: integer = 0; ADelimiter: Cardinal = 0; ADelimiterLen: integer = 0);
+      ARecvLen: integer = 0);
 var
   pk: PKRConnectorPack;
+  er: integer;
 begin
-  new(pk);
-  pk^.Pack:=APack;
-  pk^.Length:=ALength;
-  pk^.CallBack:=ACallBack;
-  pk^.pData:=AData;
-  pk^.RLen:=ARecvLen;
-  pk^.DelimiterLen:=0;
-  pk^.Delimiter:=ADelimiter;
-  pk^.DelimiterLen:=ADelimiterLen;
-  pk^.WaitResult:=AWaitResult;
-  if FQueue.AtLeast(CE_QUEUE_MAX_ITEMS) then begin
-    ACallBack(ceQueueOverflowed, APack, 0, AData);
-    Dispose(pk);
-  end else FQueue.Push(pk)
+  er:=0;
+  CS.Enter;
+  try
+    if not Assigned(FThread) then er:=ceNotActive
+    else if FListCount=CE_QUEUE_MAX_ITEMS then er:=ceQueueOverflowed
+    else begin
+      new(pk);
+      pk^.Pack:=APack;
+      pk^.Length:=ALength;
+      pk^.CallBack:=ACallBack;
+      pk^.pData:=AData;
+      pk^.RLen:=ARecvLen;
+      pk^.WaitResult:=AWaitResult;
+      FList[FListPosIn]:=pk;
+      if FListPosIn=CE_QUEUE_MAX_ITEMS-1 then FListPosIn:=0 else inc(FListPosIn);
+      inc(FListCount);
+      SetEvent(FInPackEvent);
+    end;
+  finally
+    CS.Leave;
+  end;
+  if er>0 then begin
+//    APack^.Error:=er;
+    ACallBack(er, APack, 0, AData)
+  end;
 end;
 
 procedure TKRConnector.SetActive(const Value: boolean);
+var
+  pk: PKRConnectorPack;
+  apk: array of TKRConnectorPack;
+  i,n: integer;
 begin
-  FThread.Active:=Value;
-  FThreadOut.Active:=Value;
-end;
-
-procedure TKRConnector.SetConnectTimeout(const Value: Cardinal);
-begin
-  if(Value>9)and(Value<10001)then FThread.FConnectTimeout:=Value;
-end;
-
-procedure TKRConnector.SetReadTimeout(const Value: Cardinal);
-begin
-  if(Value>9)and(Value<10001)then FThread.FReadTimeout:=Value;
-end;
-
-procedure TKRConnector.SetReconnectTime(const Value: Cardinal);
-begin
-  FThread.FReconnectTime:=Value;
+  n:=-1;
+  CS.Enter;
+  try
+    if Value then begin
+      if Assigned(FThread) then exit;
+      CreateThread;
+    end else begin
+      if not Assigned(FThread) then exit;
+      FreeAndNil(FThread);
+      SetLength(apk,FListCount);
+      n:=FListCount-1;
+      i:=0;
+      while FListCount>0 do begin
+        pk:=FList[FListPosOut];
+        if FListPosOut=CE_QUEUE_MAX_ITEMS-1 then FListPosOut:=0 else inc(FListPosOut);
+        dec(FListCount);
+        apk[i]:=pk^;
+        inc(i);
+        dispose(pk);
+      end;
+    end;
+  finally
+    CS.Leave;
+  end;
+  for i := 0 to n do
+    if Assigned(apk[i].CallBack) then begin
+      apk[i].Error:=ceNotActive;
+      apk[i].CallBack(apk[i].Error,apk[i].Pack,apk[i].Length,apk[i].pData);
+    end;
 end;
 
 procedure TKRConnector.SetRuntimeErrorEv(const Value: TKRRuntimeErrorEv);
@@ -374,85 +317,47 @@ begin
   RECS_Leave;
 end;
 
-procedure TKRConnector.SetWaitOutTime(const Value: Cardinal);
-begin
-  FThreadOut.WaitTime:=value;
-end;
-
-procedure TKRConnector.SetWaitPauseOutTime(const Value: Cardinal);
-begin
-  FThreadOut.WaitPauseTime:=value;
-end;
-
-procedure TKRConnector.SetWaitPauseTime(const Value: Cardinal);
-begin
-  FThread.WaitPauseTime:=value;
-end;
-
-procedure TKRConnector.SetWaitRespTime(const Value: Cardinal);
-begin
-  FThread.WaitRespTime:=value;
-end;
-
-procedure TKRConnector.SetWaitTime(const Value: Cardinal);
-begin
-  FThread.WaitTime:=value;
-end;
-
-procedure TKRConnector.SetWriteTimeout(const Value: Cardinal);
-begin
-  if(Value>9)and(Value<10001)then FThread.FWriteTimeout:=Value;
-end;
-
 { TKRConnectorThread }
 
-constructor TKRConnectorThread.CreateTh(AConnector: TKRConnector; AQueue,
-  AQueueOut: TKRThreadQueue);
+constructor TKRConnectorThread.CreateTh(AConnector: TKRConnector);
 begin
   FConnector:=AConnector;
-  FStat:=cstNotActive;
+
   FCounter:=0;
-  FConnectTimeout:=1000;
-  FReconnectTime:=5000;
   FLastConnectTime:=getTickCount-FReconnectTime-1;
-  FReadTimeout:=100;
-  FWriteTimeout:=100;
-  FWaitRespTime:=5;
-  FQueue:=AQueue;
-  FQueueOut:=AQueueOut;
-  inherited Create;
+  inherited Create(FConnector.FInPackEvent);
 end;
 
 procedure TKRConnectorThread.DoCallBack;
 begin
-//  if FPK^.Error=0 then FConnector.SetStat(cstConnected) else FConnector.SetStat(cstDisconnected);
-  if FQueueOut.AtLeast(CE_QUEUE_MAX_ITEMS) then begin
-    FConnector.DoRuntimeError('TKRConnectorThread[FConnector.Name="'+
-      FConnector.Name+'"] procedure DoCallBack;',Exception.Create('Исходящая очередь коннектора переполнена'));
-    Dispose(FPK);
-  end else FQueueOut.Push(FPK);
-  FPK:=nil;
+  FConnector.FThreadOut.push(FPk);
 end;
 
 procedure TKRConnectorThread.KRExecute;
 begin
+  FConnector.CS.Enter;
+  FPk:=FConnector.FList[FConnector.FListPosOut];
+  if FConnector.FListPosOut=CE_QUEUE_MAX_ITEMS-1 then FConnector.FListPosOut:=0 else inc(FConnector.FListPosOut);
+  dec(FConnector.FListCount);
+  FConnector.CS.Leave;
+
   try
-    if FQueue.Count>0 then begin
-      FPk:=PKRConnectorPack(FQueue.Pop);
-      _exec;
-    end;
+    _exec;
   except on E: Exception do
-    FConnector.DoRuntimeError('TKRConnectorThreadOut[FConnector.Name="'+
-      FConnector.Name+'"] procedure Execute;',E);
+    FConnector.DoRuntimeError('TKRConnectorThread.KRExecute[FConnector.Name="'+
+      FConnector.Name+'"]',E);
   end;
+
+  if Terminated then exit;
+
+  FConnector.CS.Enter;
+  if FConnector.FListCount=0 then ResetEvent(FConnector.FInPackEvent);
+  FConnector.CS.Leave;
 end;
 
-procedure TKRConnectorThread.KRExecutePaused;
-begin
+procedure TKRConnectorThread.KRExecuteFirst; begin end;
 
-end;
-
-procedure TKRConnectorThread.KRExecutePausedFirst;
+procedure TKRConnectorThread.KRExecuteLast;
 begin
   SetStat(cstNotActive);
 end;
@@ -481,11 +386,13 @@ end;
 
 procedure TKRConnectorThread.SetStat(AStat: TKRConnectorStat);
 begin
-  if FStat<>AStat then begin
-    FStat:=AStat;
-    FLastStatusSendTm:=getTickCount;
-    Synchronize(Status);
-  end else if(FStat=cstWaitReconnecting)and((getTickCount-FLastStatusSendTm)>500)then begin
+  if FConnector.FStat<>AStat then begin
+    FConnector.FStat:=AStat;
+    if Assigned(FConnector.FConnectionStatus) then begin
+      FLastStatusSendTm:=getTickCount;
+      Synchronize(Status);
+    end;
+  end else if(Assigned(FConnector.FConnectionStatus))and(AStat=cstWaitReconnecting)and((getTickCount-FLastStatusSendTm)>500)then begin
     FLastStatusSendTm:=getTickCount;
     Synchronize(Status);
   end;
@@ -494,38 +401,66 @@ end;
 procedure TKRConnectorThread.Status;
 begin
   if Assigned(FConnector.FConnectionStatus) then
-    FConnector.FConnectionStatus(FConnector,FStat,getTickCount-FLastConnectTime);
-end;
-
-procedure TKRConnectorThread._exec;
-begin
-
+    FConnector.FConnectionStatus(FConnector,FConnector.FStat,getTickCount-FLastConnectTime);
 end;
 
 { TKRConnectorThreadOut }
 
-constructor TKRConnectorThreadOut.CreateTh(AConnector: TKRConnector;
-  AQueueOut: TKRThreadQueue);
+constructor TKRConnectorThreadOut.CreateTh(AConnector: TKRConnector; AOutPackEvent: THandle);
 begin
+  CS:=TCriticalSection.Create;
   FConnector:=AConnector;
-  FQueueOut:=AQueueOut;
-  inherited Create;
+  FOutPackEvent:=AOutPackEvent;
+
+  FListPosIn:=0;
+  FListPosOut:=0;
+  FListCount:=0;
+  inherited Create(FOutPackEvent);
 end;
 
 procedure TKRConnectorThreadOut.KRExecute;
 var
   pk: PKRConnectorPack;
 begin
-  if FQueueOut.Count>0 then begin
-    pk:=PKRConnectorPack(FQueueOut.Pop);
+  pk:=FList[FListPosOut];
+  if FListPosOut=CE_QUEUE_MAX_ITEMS-1 then FListPosOut:=0 else inc(FListPosOut);
+  try
+    if Assigned(pk^.CallBack) then
+      pk^.CallBack(pk^.Error,pk^.Pack,pk^.Length,pk^.pData);
+  except on E: Exception do
+    FConnector.DoRuntimeError('TKRConnectorThreadOut.KRExecute[FConnector.Name="'+
+      FConnector.Name+'"]',E);
+  end;
+  Dispose(pk);
+  CS.Enter;
+  dec(FListCount);
+  if FListCount=0 then ResetEvent(FOutPackEvent);
+  CS.Leave;
+end;
+
+procedure TKRConnectorThreadOut.KRExecuteLast;
+begin
+  CS.Free;
+end;
+
+procedure TKRConnectorThreadOut.push(p: PKRConnectorPack);
+begin
+  if FListCount=CE_QUEUE_MAX_ITEMS then begin
     try
-      if Assigned(pk^.CallBack) then
-        pk^.CallBack(pk^.Error,pk^.Pack,pk^.Length,pk^.pData);
+      if Assigned(p^.CallBack) then
+        p^.CallBack(p^.Error,p^.Pack,p^.Length,p^.pData);
     except on E: Exception do
-      FConnector.DoRuntimeError('TKRConnectorThreadOut[FConnector.Name="'+
-        FConnector.Name+'"] procedure Execute;',E);
+      FConnector.DoRuntimeError('TKRConnectorThreadOut.push[FConnector.Name="'+
+        FConnector.Name+'"]',E);
     end;
-    Dispose(pk);
+    Dispose(p);
+  end else begin
+    CS.Enter;
+    FList[FListPosIn]:=p;
+    if FListPosIn=CE_QUEUE_MAX_ITEMS-1 then FListPosIn:=0 else inc(FListPosIn);
+    inc(FListCount);
+    SetEvent(FOutPackEvent);
+    CS.Leave;
   end;
 end;
 

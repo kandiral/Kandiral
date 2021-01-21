@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRTCPSocketServer                                                         *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 16.09.2019                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -12,7 +12,13 @@ unit KRTCPSocketServer;
 
 interface
 
-uses KRSockets, JwaWinsock2;
+uses
+  {$IF CompilerVersion >= 23}
+    Winapi.Winsock2,
+  {$ELSE}
+    Winsock2,
+  {$IFEND}
+  KRSockets;
 
 type
   TKRTCPSocketServer = class;
@@ -57,20 +63,23 @@ end;
 function TKRTCPSocketServer.Accept: TKRSocketSrvClient;
 var
   sock: TSocket;
-  addr: sockaddr_in;
+  addr: TSockAddr;
   len: Integer;
 begin
   Result := nil;
   len := sizeof(addr);
   Fillchar(addr, sizeof(addr), 0);
   try
-    Sock := ErrorCheck(JwaWinSock2.accept(FSocket, @addr, @len));
+    Sock := ErrorCheck( {$IF CompilerVersion >= 23}Winapi.{$IFEND}Winsock2.accept(
+      FSocket,
+      @addr,
+      @len));
   except
     Sock := INVALID_SOCKET;
   end;
   if Sock <> INVALID_SOCKET then begin
     Result := TKRTCPSocketSrvClient.CreateClient(Self,Sock,
-      inet_ntoa(addr.sin_addr),ntohs(addr.sin_port));
+      inet_ntoa(TSockAddrIn(addr).sin_addr),ntohs(TSockAddrIn(addr).sin_port));
     FClients.Add(Result);
   end;
 end;
@@ -86,23 +95,23 @@ end;
 
 procedure TKRTCPSocketServer.Open;
 var
-  addr: sockaddr_in;
+  addr: TSockAddr;
   AddrSize: Cardinal;
 begin
   inherited;
   if Active and not FConnected then begin
     AddrSize := SizeOf(Addr);
     FillChar(Addr, AddrSize, 0);
-    addr.sin_family := AF_INET;
+    TSockAddrIn(addr).sin_family := AF_INET;
     if FAddr='' then
-      addr.sin_addr.s_addr := htonl(INADDR_ANY)
+      TSockAddrIn(addr).sin_addr.s_addr := htonl(INADDR_ANY)
     else
-      addr.sin_addr.s_addr := inet_addr(PAnsiChar(FAddr));
-    addr.sin_port := htons(FPort);
+      TSockAddrIn(addr).sin_addr.s_addr := inet_addr(PAnsiChar(FAddr));
+    TSockAddrIn(addr).sin_port := htons(FPort);
 
-    if ErrorCheck(JwaWinSock2.bind(FSocket, @addr, sizeof(addr))) = 0 then
+    if ErrorCheck(bind(FSocket, addr, sizeof(addr))) = 0 then
       if FSType=SOCK_DGRAM then FConnected:=true
-      else FConnected:=ErrorCheck(JwaWinSock2.listen(FSocket, SOMAXCONN)) = 0;
+      else FConnected:=ErrorCheck(listen(FSocket, SOMAXCONN)) = 0;
   end;
 end;
 

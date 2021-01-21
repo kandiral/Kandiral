@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRTimer                                                                   *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 16.09.2019                                                          *)
 (*  https://kandiral.ru/delphi/krtimer.pas.html                               *)
 (*                                                                            *)
 (******************************************************************************)
@@ -39,12 +39,12 @@ type
 
 
     procedure SetProcessMessages(const Value: integer);
-    procedure DoTimer;
     procedure SetEnabled(const Value: boolean);
     procedure SetInterval(const Value: Cardinal);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    procedure DoTimer;
     procedure AddMon(AComp: TComponent);
     procedure DelMon(AComp: TComponent);
     property Working: boolean read FWorking;

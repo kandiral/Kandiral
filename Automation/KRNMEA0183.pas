@@ -14,12 +14,12 @@ interface
 
 uses
   {$IF CompilerVersion >= 23}
-    Winapi.Windows, System.Classes, System.StrUtils, System.SysUtils, Winapi.MMSystem,
+    Winapi.Windows, System.Classes, System.StrUtils, System.SysUtils,
     Vcl.ExtCtrls, Vcl.Forms, System.Variants,
   {$ELSE}
-    Windows, Classes, StrUtils, SysUtils, MMSystem, ExtCtrls, Forms, Variants,
+    Windows, Classes, StrUtils, SysUtils, ExtCtrls, Forms, Variants,
   {$IFEND}
-  KRRuntimeErrors, KRTypes, KRThread, KRComPort, KRCOMPortSets, Funcs, lgop;
+  KRRuntimeErrors, KRTypes, KRThread, KRComPort, KRCOMPortSets;
 
 type
   TKRNMEA0183Thread = class;
@@ -180,7 +180,7 @@ end;
 
 function TKRNMEA0183.GetGMDate: Variant;
 begin
-  if(ElapsedTime(FTime_lu)<2000)and(ElapsedTime(FDate_lu)<5000)then
+  if((getTickCount-FTime_lu)<2000)and((getTickCount-FDate_lu)<5000)then
     Result:=FTime+FDate
   else Result:=Null;
 end;
@@ -202,7 +202,7 @@ end;
 
 function TKRNMEA0183.GetLatitude: Variant;
 begin
-  if(ElapsedTime(FLatitude_lu)<2000)and(ElapsedTime(FLatitudeP_lu)<2000)then begin
+  if((getTickCount-FLatitude_lu)<2000)and((getTickCount-FLatitudeP_lu)<2000)then begin
     Result:=FLatitude;
     if not FLatitudeP then Result:=-Result;
   end else Result:=Null;
@@ -224,7 +224,7 @@ end;
 
 function TKRNMEA0183.GetLongitude: Variant;
 begin
-  if(ElapsedTime(FLongitude_lu)<2000)and(ElapsedTime(FLongitudeJ_lu)<2000)then begin
+  if((getTickCount-FLongitude_lu)<2000)and((getTickCount-FLongitudeJ_lu)<2000)then begin
     Result:=FLongitude;
     if not FLongitudeJ then Result:=-Result;
   end else Result:=Null;
@@ -275,7 +275,7 @@ end;
 procedure TKRNMEA0183.SetDate(ADate: TDateTime);
 begin
   FDate:=ADate;
-  FDate_lu:={$IF CompilerVersion >= 23}Winapi.{$IFEND}MMSystem.timeGetTime;
+  FDate_lu:=getTickCount;
 end;
 
 procedure TKRNMEA0183.SetFlowControl(const Value: TKRFlowControl);
@@ -302,25 +302,25 @@ end;
 procedure TKRNMEA0183.SetLatitude(ALatitude: Double);
 begin
   FLatitude:=ALatitude;
-  FLatitude_lu:={$IF CompilerVersion >= 23}Winapi.{$IFEND}MMSystem.timeGetTime;
+  FLatitude_lu:=getTickCount;
 end;
 
 procedure TKRNMEA0183.SetLatitudeP(ALatitudeP: boolean);
 begin
   FLatitudeP:=ALatitudeP;
-  FLatitudeP_lu:={$IF CompilerVersion >= 23}Winapi.{$IFEND}MMSystem.timeGetTime;
+  FLatitudeP_lu:=getTickCount;
 end;
 
 procedure TKRNMEA0183.SetLongitude(ALongitude: Double);
 begin
   FLongitude:=ALongitude;
-  FLongitude_lu:={$IF CompilerVersion >= 23}Winapi.{$IFEND}MMSystem.timeGetTime;
+  FLongitude_lu:=getTickCount;
 end;
 
 procedure TKRNMEA0183.SetLongitudeJ(ALongitudeJ: boolean);
 begin
   FLongitudeJ:=ALongitudeJ;
-  FLongitudeJ_lu:={$IF CompilerVersion >= 23}Winapi.{$IFEND}MMSystem.timeGetTime;
+  FLongitudeJ_lu:=getTickCount;
 end;
 
 procedure TKRNMEA0183.SetParity(const Value: integer);
@@ -348,7 +348,7 @@ end;
 procedure TKRNMEA0183.SetTime(ATime: TDateTime);
 begin
   FTime:=ATime;
-  FTime_lu:={$IF CompilerVersion >= 23}Winapi.{$IFEND}MMSystem.timeGetTime;
+  FTime_lu:=getTickCount;
 end;
 
 { TKRNMEA0183Thread }
@@ -429,7 +429,7 @@ begin
       btRec:=FNMEA0183.FComPort.Read(_Buf,32);
       if (btRec>0) then begin
         FDATA:=true;
-        FDATA_T:={$IF CompilerVersion >= 23}Winapi.{$IFEND}MMSystem.timeGetTime;
+        FDATA_T:=getTickCount;
       end;
 
       for i := 0 to btRec-1 do begin
@@ -443,16 +443,16 @@ begin
         if FBuf[FBuf_i]=$2A then _crc_stop:=true;
         if not _crc_stop then _crc:=_crc xor FBuf[FBuf_i];
         if(FBuf_i>0)and(FBuf[FBuf_i-1]=$D)and(FBuf[FBuf_i]=$A)then begin
-          if(_crc_stop and (HexToInt(Chr(FBuf[FBuf_i-3])+Chr(FBuf[FBuf_i-2]))=_crc))then begin
+          if(_crc_stop and (StrToInt('$'+Chr(FBuf[FBuf_i-3])+Chr(FBuf[FBuf_i-2]))=_crc))then begin
             if(FBuf_i>5)and(FBuf[0]=$24)and(FBuf[6]=$2C)then begin
               FVDATA:=true;
-              FVDATA_T:={$IF CompilerVersion >= 23}Winapi.{$IFEND}MMSystem.timeGetTime;
-              wd:=BytesToWord(FBuf[1],FBuf[2]);
+              FVDATA_T:=getTickCount;
+              wd:=MakeWord(FBuf[1],FBuf[2]);
               if wd<>FTID then begin
                 FTID:=wd;
                 FTalkerIdentifier:=Char(FBuf[1])+Char(FBuf[2]);
               end;
-              FSentenceIdentifier:=WordsToDWORD(BytesToWord(FBuf[5],FBuf[4]),BytesToWord(FBuf[3],0));
+              FSentenceIdentifier:=MakeLong(MakeWord(FBuf[5],FBuf[4]),MakeWord(FBuf[3],0));
               case FSentenceIdentifier of
               $524D43: RMC;
               $474741: GGA;
@@ -462,8 +462,8 @@ begin
           FBuf_i:=0;
         end else inc(FBuf_i);
       end;
-      if(FDATA)and(ElapsedTime(FDATA_T)>2000)then FDATA:=false;
-      if(FVDATA)and(ElapsedTime(FVDATA_T)>2000)then FVDATA:=false;
+      if(FDATA)and((getTickCount-FDATA_T)>2000)then FDATA:=false;
+      if(FVDATA)and((getTickCount-FVDATA_T)>2000)then FVDATA:=false;
 
 
     end;

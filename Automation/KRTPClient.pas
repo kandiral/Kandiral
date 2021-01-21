@@ -18,7 +18,7 @@ uses
   {$ELSE}
     Windows, Messages, Classes, Forms,
   {$IFEND}
-  KRConnector, KRThread, KRTypes, KRCRC, lgop;
+  KRConnector, KRThread, KRTypes, KRCRC;
 
 type
   TKRTPClientPack = record
@@ -96,7 +96,7 @@ begin
     Result:=2;
     exit;
   end;
-  if KRCRC16(ABuffer,ALength-2)<>BytesToWord(ABuffer^[ALength-2],ABuffer^[ALength-1]) then begin
+  if KRCRC16(ABuffer,ALength-2)<>MakeWord(ABuffer^[ALength-2],ABuffer^[ALength-1]) then begin
     Result:=3;
     exit;
   end;

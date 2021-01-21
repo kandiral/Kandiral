@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  lgop                                                                      *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 08.10.2019                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -30,76 +30,22 @@ uses Windows, Variants, SysUtils, KRTypes;
   procedure WordsFromDWord(dw: DWord; out wd0,wd1: Word);
   function SetCount(Val: Cardinal; Bits: byte):integer;
   function SetBits(Val: Cardinal; Bits: byte; var B: TKRBuffer): integer;
-  function LRot(const Value: Byte; const Count: Byte): Byte; overload;
-  function LRot(const Value: Word; const Count: Byte): Word; overload;
-  function LRot(const Value: Integer; const Count: Byte): Integer; overload;
-  function RRot(const Value: Byte; const Count: Byte): Byte; overload;
-  function RRot(const Value: Word; const Count: Byte): Word; overload;
-  function RRot(const Value: Integer; const Count: Byte): Integer; overload;
   function mshr(x:Integer; mypow: Byte):Integer;
-  function LSwap(c:cardinal):cardinal;
 
 implementation
 
 uses Funcs;
 
-function LSwap(c:cardinal):cardinal;
-begin
- Result:=swap(c shr 16)+swap(c) shl 16;
-end;
-
 function mshr(x:Integer; mypow: Byte):Integer;
 asm
-   PUSH EAX;
-   PUSH CX;
-   MOV EAX, x
-   MOV CL, mypow
-   SAR EAX, CL  // Используем i80x86 SAR команду (Деление со знаком двойного слова)
-   MOV Result, EAX
-   POP CX;
-   POP EAX;
- end;
-
-function RRot(const Value: Byte; const Count: Byte): Byte; assembler;
-asm
-MOV CL, Count
-MOV AL, Value
-ROR AL, CL
-MOV Result, AL
-end;
-
-function RRot(const Value: Word; const Count: Byte): Word; assembler;
-asm
-MOV CL, Count
-MOV AX, Value
-ROR AX, CL
-MOV Result, AX
-end;
-
-function RRot(const Value: Integer; const Count: Byte): Integer; assembler;
-asm
-MOV CL, Count
-MOV EAX, Value
-ROR EAX, CL
-MOV Result, EAX
-end;
-
-function LRot(const Value: Byte; const Count: Byte): Byte; assembler;
-asm
-MOV CL, Count
-ROL AL, CL
-end;
-
-function LRot(const Value: Word; const Count: Byte): Word; assembler;
-asm
-MOV CL, Count
-ROL AX, CL
-end;
-
-function LRot(const Value: Integer; const Count: Byte): Integer; assembler;
-asm
-MOV CL, Count
-ROL EAX, CL
+  PUSH EAX;
+  PUSH CX;
+  MOV EAX, x
+  MOV CL, mypow
+  SAR EAX, CL  // Используем i80x86 SAR команду (Деление со знаком двойного слова)
+  MOV Result, EAX
+  POP CX;
+  POP EAX;
 end;
 
 function SetBits(Val: Cardinal; Bits: byte; var B: TKRBuffer):integer;

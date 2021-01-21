@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRMBRegs                                                                  *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 20.11.2019                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -193,7 +193,6 @@ begin
   fld.Width:=120;
   fld.Variable:=reg;
   fld.ValType:=reg.VarType;
-  fld.Timer:=KRTimer1;
 
   btnUp:=TButton.Create(ScrollBox1);
   btnUp.Tag:=n;

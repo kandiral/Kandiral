@@ -12,60 +12,19 @@ unit KRModbus;
 
 interface
 
-{$I '..\Includes\language.inc'}
-
 uses
   {$IF CompilerVersion >= 23}
     System.SysUtils,
   {$ELSE}
     SysUtils,
   {$IFEND}
-  KRTypes, lgop, Funcs;
+  KRModbusLng, KRTypes;
 
 type
-  TModbusError = integer;
   TMBFunc = byte;
   TMBType = (mbtRTU, mbtTCP, mbtASCII);
 
 const
-  MB_QUEUE_MAX_ITEMS = 255;
-
-  MB_ERRORS_COUNT = 9;
-
-  MBERR_OK = TModbusError(0);
-  MBERR_ILLEGAL_FUNCTION = TModbusError(1);
-  MBERR_ILLEGAL_DATA_ADDRESS = TModbusError(2);
-  MBERR_ILLEGAL_DATA_VALUE = TModbusError(3);
-  MBERR_FAILURE_IN_ASSOCIATED_DEVICE = TModbusError(4);
-  MBERR_ACKNOWLEDGE = TModbusError(5);
-  MBERR_BUSY_REJECTED_MESSAGE = TModbusError(6);
-  MBERR_NAK_NEGATIVE_ACKNOWLEDGMENT = TModbusError(7);
-  MBERR_MEMORY_PARITY_ERROR = TModbusError(8);
-
-  MODBUS_ERRORS_MSG : array[0..MB_ERRORS_COUNT-1] of String = (
-{$IFDEF RUSSIAN_LANGUAGE}
-     'Нет ошибок',
-     'Недопустимый номер функции',
-     'Некорректный адрес регистра',
-     'Некорректные данные',
-     'Отказ оборудования прибора',
-     'Данные не готовы',
-     'Система занята',
-     'Отрицательное подтверждение',
-     'Ошибка четности памяти'
-{$ELSE}
-     'No errors',
-     'Invalid function number',
-     'Invalid register address',
-     'Invalid data',
-     'Instrument hardware failure',
-     'Data not ready',
-     'System busy',
-     'Negative acknowledgment',
-     'Memory parity error'
-{$ENDIF}
-  );
-
   mbfReadCoils = TMBFunc($01);
   mbfReadDiscretInputs = TMBFunc($02);
   mbfReadHoldingRegisters = TMBFunc($03);
@@ -103,27 +62,26 @@ implementation
 
 function MBHexCharToValue(AChar: byte): byte;
 begin
-  Result:=AChar-48;
-  if Result>9 then Result:=Result-7;
+  if AChar>57 then Result:=AChar-55 else Result:=AChar-48;
 end;
 
 function MBHexToValue(AChar1, AChar2: byte): byte;
 begin
-  Result:=MBHexCharToValue(AChar1)*16 + MBHexCharToValue(AChar2);
+  Result:=(MBHexCharToValue(AChar1) shl 4) or MBHexCharToValue(AChar2);
 end;
 
 function MBLRC(ABuffer: PKRBuffer; ALength: byte): byte;
 var
-  i: Integer;
-  wd: Word;
+  i,n: Integer;
 begin
-  wd := 0;
+  Result:= 0;
   i := 1;
-  while i<ALength-4 do begin
-    wd:=WordRec(wd).Lo+MBHexToValue(ABuffer^[i],ABuffer^[i+1]);
+  n:=ALength-4;
+  while i<n do begin
+    Inc(Result,MBHexToValue(ABuffer^[i],ABuffer^[i+1]));
     Inc(i,2);
   end;
-  Result:=$FF-WordRec(wd).Lo;
+  Result:=(Result xor $FF)+1;
 end;
 
 function _RegsToWord(reg: word; AHighByteFirst: boolean): word;
@@ -250,26 +208,23 @@ end;
 function MBRegsToSTRING(AData: TKRRegisters; AHighByteFirst: boolean): String;
 var
   i,j: Integer;
-  bt0, bt1: Byte;
   s: AnsiString;
 begin
   SetLength(s,Length(AData)*2);
   if AHighByteFirst then
     for i := 0 to Length(AData)-1 do begin
-      BytesFromWord(AData[i],bt0,bt1);
-      s[i*2+1]:=AnsiChar(bt0);
-      s[i*2+2]:=AnsiChar(bt1);
+      s[i*2+1]:=AnsiChar(AData[i] and $ff);
+      s[i*2+2]:=AnsiChar(AData[i] shr 8);
     end
   else begin
     j:=1;
     for i := Length(AData)-1 downto 0 do begin
-      BytesFromWord(AData[i],bt0,bt1);
-      s[j*2]:=AnsiChar(bt0);
-      s[j*2+1]:=AnsiChar(bt1);
+      s[j*2]:=AnsiChar(AData[i] and $ff);
+      s[j*2+1]:=AnsiChar(AData[i] shr 8);
       inc(j);
     end
   end;
-  Result:=StringToWideString(s,1251);
+  Result:=String(s);
 end;
 
 end.

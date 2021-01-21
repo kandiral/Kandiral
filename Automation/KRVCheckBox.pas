@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRVCheckBox                                                               *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 31.08.2017                                                          *)
 (*  https://kandiral.ru/delphi/krvcheckbox.pas.html                           *)
 (*                                                                            *)
 (******************************************************************************)
@@ -19,18 +19,17 @@ uses
   {$ELSE}
     Classes, StdCtrls, MMSystem, Messages, Controls, ExtCtrls, Forms,
   {$IFEND}
-  KRTimer, KRVariables;
+  KRVariables, KRVariants, KRLogical;
 
 type
   TKRVCBAType = (vcbatSetBit, vcbatSetValue);
   TKRVCBSType = (vcbstByBit, vcbstByValue);
 
-  TKRVCheckBox = class(TCustomCheckBox, IKRTimer)
+  TKRVCheckBox = class(TCustomCheckBox, IKRVarUp)
   private
     FAction: TKRVCBAType;
     FVarIn: TKRVariable;
     FVarOut: TKRVariable;
-    FTimer: TKRTimer;
     FClick: TNotifyEvent;
     FState: TKRVCBSType;
     FStatBit: byte;
@@ -40,14 +39,15 @@ type
     FOffActValue: Variant;
     procedure SetAction(const Value: TKRVCBAType);
     procedure _Click;
-    procedure DoTimer; stdcall;
+    procedure DoTimer(AChanged: boolean = false);
     procedure SetVarIn(const Value: TKRVariable);
     procedure SetVarOut(const Value: TKRVariable);
-    procedure SetTimer(const Value: TKRTimer);
     procedure SetState(const Value: TKRVCBSType);
     procedure SetOffActValue(const Value: Variant);
     procedure SetOnActValue(const Value: Variant);
     procedure SetOnStatValue(const Value: Variant);
+    procedure VarUp(AVar: TKRVariable); stdcall;
+    procedure VarErr(AVar: TKRVariable); stdcall;
   protected
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     procedure Toggle; override;
@@ -64,7 +64,6 @@ type
     property OnActValue: Variant read FOnActValue write SetOnActValue;
     property OffActValue: Variant read FOffActValue write SetOffActValue;
     property OnStatValue: Variant read FOnStatValue write SetOnStatValue;
-    property Timer: TKRTimer read FTimer write SetTimer;
     property Align;
     property Alignment;
     property AllowGrayed;
@@ -116,8 +115,6 @@ type
 
 implementation
 
-uses lgop, funcs;
-
 { TKRVCheckBox }
 
 constructor TKRVCheckBox.Create(AOvner: TComponent);
@@ -127,25 +124,23 @@ begin
   FState:=vcbstByBit;
   FActBit:=0;
   FStatBit:=0;
+  DoTimer(true);
 end;
 
 destructor TKRVCheckBox.Destroy;
 begin
-  if(Assigned(FTimer))then FTimer.DelMon(Self);
+  if(Assigned(FVarIn))then FVarIn.DelMon(Self);
   inherited;
 end;
 
-procedure TKRVCheckBox.DoTimer;
-var
-  ch: boolean;
+procedure TKRVCheckBox.DoTimer(AChanged: boolean = false);
 begin
   if not assigned(FVarIn) then exit;
-  ch:=false;
+
   case FState of
-    vcbstByBit: ch:=getBit(FVarIn.Value,FStatBit);
-    vcbstByValue: ch:=IsVariantsEqual(FVarIn.Value,FOnStatValue);
+    vcbstByBit: SetChecked(KRGetBit32(FVarIn.Value, FStatBit));
+    vcbstByValue: SetChecked(KRVarIsEqually(FVarIn.Value,FOnStatValue));
   end;
-  if ch<>GetChecked then SetChecked(ch);
 end;
 
 procedure TKRVCheckBox.Notification(AComponent: TComponent;
@@ -154,8 +149,7 @@ begin
   inherited;
   if(Operation = opRemove)then
     if (AComponent = FVarIn)then FVarIn:= nil else
-    if (AComponent = FVarOut)then FVarOut:= nil else
-    if (AComponent = FTimer)then FTimer:= nil;
+    if (AComponent = FVarOut)then FVarOut:=nil;
 end;
 
 procedure TKRVCheckBox.SetAction(const Value: TKRVCBAType);
@@ -216,31 +210,20 @@ begin
   FState := Value;
 end;
 
-procedure TKRVCheckBox.SetTimer(const Value: TKRTimer);
-begin
-  if FTimer<>Value then begin
-    if(Assigned(FTimer))then begin
-      while FTimer.Working do Application.ProcessMessages;
-      FTimer.DelMon(Self);
-    end;
-    FTimer := Value;
-    if(Assigned(FTimer))then begin
-      FTimer.FreeNotification(Self);
-      while FTimer.Working do Application.ProcessMessages;
-      FTimer.AddMon(Self);
-    end;
-  end;
-end;
-
 procedure TKRVCheckBox.SetVarIn(const Value: TKRVariable);
 begin
   if FVarIn<>Value then begin
+    if Assigned(FVarIn) then begin
+      FVarIn.DelMon(Self);
+      FVarIn.RemoveFreeNotification(Self);
+    end;
     FVarIn := Value;
     if Assigned(FVarIn) then begin
       FVarIn.FreeNotification(Self);
-      SetOnStatValue(FOnStatValue);
+      FVarIn.AddMon(Self);
     end;
   end;
+  DoTimer(true);
 end;
 
 procedure TKRVCheckBox.SetVarOut(const Value: TKRVariable);
@@ -265,13 +248,25 @@ begin
   end;
 end;
 
+procedure TKRVCheckBox.VarErr(AVar: TKRVariable);
+begin
+  DoTimer(true);
+end;
+
+procedure TKRVCheckBox.VarUp(AVar: TKRVariable);
+begin
+  DoTimer;
+end;
+
 procedure TKRVCheckBox._Click;
 begin
   if Assigned(FClick) then FClick(Self);
   if Assigned(FVarOut) then begin
     case FAction of
-      vcbatSetBit: FVarOut.Value:=_is(inherited State = cbChecked,ClearBit(FVarOut.Value,FActBit),SetBit(FVarOut.Value,FActBit));
-      vcbatSetValue: FVarOut.Value:=_is(inherited State = cbChecked,FOnActValue,FOffActValue);
+      vcbatSetBit: if inherited State = cbChecked then FVarOut.Value:=KRClearBit32(FVarOut.Value,FActBit)
+        else FVarOut.Value:=KRSetBit32(FVarOut.Value,FActBit);
+      vcbatSetValue: if inherited State = cbChecked then FVarOut.Value:=FOnActValue
+        else FVarOut.Value:=FOffActValue;
     end;
   end;
 end;

@@ -96,24 +96,33 @@
         <DCCReference Include="designide.dcp"/>
         <DCCReference Include="KRCommon.dcp"/>
         <DCCReference Include="KRAutomationRegister.pas"/>
+        <DCCReference Include="..\..\Automation\KRAsyncComPort.pas"/>
         <DCCReference Include="..\..\Automation\KRBTConnector.pas"/>
         <DCCReference Include="..\..\Automation\KRBtnVarUpdate.pas"/>
         <DCCReference Include="..\..\Automation\KRBTServer.pas"/>
         <DCCReference Include="..\..\Automation\KRCOMPort.pas"/>
         <DCCReference Include="..\..\Automation\KRCOMPortConnector.pas"/>
         <DCCReference Include="..\..\Automation\KRCOMPortSets.pas"/>
+        <DCCReference Include="..\..\Automation\KRCOMPortSetsLng.pas"/>
         <DCCReference Include="..\..\Automation\KRConnector.pas"/>
+        <DCCReference Include="..\..\Automation\KRConnectorLng.pas"/>
         <DCCReference Include="..\..\Automation\KRConnectorQueueBar.pas"/>
         <DCCReference Include="..\..\Automation\KRField.pas"/>
+        <DCCReference Include="..\..\Automation\KRFieldLng.pas"/>
         <DCCReference Include="..\..\Automation\KRIndicator.pas"/>
+        <DCCReference Include="..\..\Automation\KRMBMon.pas"/>
         <DCCReference Include="..\..\Automation\KRMBQueueBar.pas"/>
         <DCCReference Include="..\..\Automation\KRMBRegIndex.pas"/>
         <DCCReference Include="..\..\Automation\KRMBRegInterval.pas"/>
         <DCCReference Include="..\..\Automation\KRMBRegReadFunc.pas"/>
+        <DCCReference Include="..\..\Automation\KRMBRegs.pas"/>
         <DCCReference Include="..\..\Automation\KRMBRegWriteFunc.pas"/>
         <DCCReference Include="..\..\Automation\KRModbus.pas"/>
         <DCCReference Include="..\..\Automation\KRModbusClient.pas"/>
+        <DCCReference Include="..\..\Automation\KRModbusClientLng.pas"/>
+        <DCCReference Include="..\..\Automation\KRModbusLng.pas"/>
         <DCCReference Include="..\..\Automation\KRModbusMaster.pas"/>
+        <DCCReference Include="..\..\Automation\KRModbusMasterLng.pas"/>
         <DCCReference Include="..\..\Automation\KRModbusSlave.pas"/>
         <DCCReference Include="..\..\Automation\KRModem.pas"/>
         <DCCReference Include="..\..\Automation\KRNMEA0183.pas"/>
@@ -128,11 +137,8 @@
         <DCCReference Include="..\..\Automation\KRVarLabel.pas"/>
         <DCCReference Include="..\..\Automation\KRVButton.pas"/>
         <DCCReference Include="..\..\Automation\KRVCheckBox.pas"/>
-        <DCCReference Include="..\..\Automation\KRVComboBox.pas"/>
-        <DCCReference Include="..\..\Automation\KRAsyncComPort.pas"/>
-        <DCCReference Include="..\..\Automation\KRMBMon.pas"/>
-        <DCCReference Include="..\..\Automation\KRMBRegs.pas"/>
         <DCCReference Include="..\..\Automation\KRVCheckGroupBox.pas"/>
+        <DCCReference Include="..\..\Automation\KRVComboBox.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

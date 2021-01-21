@@ -74,16 +74,10 @@
 			<DCCReference Include="..\..\Common\KRValueEdit.pas"/>
 			<DCCReference Include="..\..\Common\KRVersionInfo.pas"/>
 			<DCCReference Include="KRCommonRegister.pas"/>
-			<DCCReference Include="..\..\Utils\funcs.pas"/>
-			<DCCReference Include="..\..\Utils\KRCRC.pas"/>
-			<DCCReference Include="..\..\Utils\KRHTMLParseUtils.pas"/>
 			<DCCReference Include="..\..\Utils\KRRuntimeErrors.pas"/>
-			<DCCReference Include="..\..\Utils\KRStreamCoder.pas"/>
 			<DCCReference Include="..\..\Utils\KRStrUtils.pas"/>
 			<DCCReference Include="..\..\Utils\KRTypes.pas"/>
 			<DCCReference Include="..\..\Utils\KRWindows.pas"/>
-			<DCCReference Include="..\..\Utils\lgop.pas"/>
-			<DCCReference Include="..\..\Utils\md5.pas"/>
 			<DCCReference Include="..\..\Net\KRBTSocketClient.pas"/>
 			<DCCReference Include="..\..\Net\KRBTSocketServer.pas"/>
 			<DCCReference Include="..\..\Net\KRParser.pas"/>
@@ -93,8 +87,22 @@
 			<DCCReference Include="..\..\Net\KRTCPSocketServer.pas"/>
 			<DCCReference Include="..\..\Net\KRUDPSocketServer.pas"/>
 			<DCCReference Include="..\..\Common\KRBLEdit.pas"/>
+			<DCCReference Include="..\..\Common\KRThreadQueueEvent.pas"/>
+			<DCCReference Include="..\..\Common\KRThreadEvent.pas"/>
+			<DCCReference Include="..\..\Common\KRValueEditLng.pas"/>
+			<DCCReference Include="..\..\Utils\KRMsgBox.pas"/>
+			<DCCReference Include="..\..\Utils\KRDateTime.pas"/>
+			<DCCReference Include="..\..\Utils\KRVariants.pas"/>
+			<DCCReference Include="..\..\Utils\KRLogical.pas"/>
+			<DCCReference Include="..\..\Crypting\KRBCrypt.pas"/>
+			<DCCReference Include="..\..\Crypting\KRCRC.pas"/>
+			<DCCReference Include="..\..\Crypting\KRCryptCommon.pas"/>
+			<DCCReference Include="..\..\Utils\funcs.pas"/>
+			<DCCReference Include="..\..\Utils\KRUtils.pas"/>
+			<DCCReference Include="..\..\Utils\lgop.pas"/>
 			<DCCReference Include="..\..\Utils\uLkJSON.pas"/>
-			<DCCReference Include="..\..\Utils\ISO3166.pas"/>
+			<DCCReference Include="..\..\Crypting\KRBase64.pas"/>
+			<DCCReference Include="..\..\ISO\ISO3166.pas"/>
 			<BuildConfiguration Include="Release">
 				<Key>Cfg_2</Key>
 				<CfgParent>Base</CfgParent>
@@ -145,9 +153,12 @@
 						<VersionInfoKeys Name="Comments"/>
 					</VersionInfoKeys>
 					<Excluded_Packages>
-						<Excluded_Packages Name="C:\Program Files (x86)\FastReport 5 VCL Standard\LibD15\dclfrxIBX15.bpl">FastReport 5.0 IBX Components</Excluded_Packages>
-						<Excluded_Packages Name="C:\Program Files (x86)\FastReport 5 VCL Standard\LibD15\dclfsIBX15.bpl">FastScript 1.9 IBX Components</Excluded_Packages>
-						<Excluded_Packages Name="C:\Users\Public\Documents\RAD Studio\8.0\Bp\JvCmpDesign150.bpl">JVCL Non-Visual Components</Excluded_Packages>
+						<Excluded_Packages Name="$(BDSBIN)\dclIndyCore150.bpl">Indy 10 Core Design Time</Excluded_Packages>
+						<Excluded_Packages Name="$(BDSBIN)\dclIndyProtocols150.bpl">Indy 10 Protocols Design Time</Excluded_Packages>
+						<Excluded_Packages Name="$(BDSBIN)\dcloffice2k150.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
+						<Excluded_Packages Name="$(BDSBIN)\dclofficexp150.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
+						<Excluded_Packages Name="C:\Program Files\FastReport 5 VCL Standard\LibD15\dclfrxIBX15.bpl">FastReport 5.0 IBX Components</Excluded_Packages>
+						<Excluded_Packages Name="C:\Program Files\FastReport 5 VCL Standard\LibD15\dclfsIBX15.bpl">FastScript 1.9 IBX Components</Excluded_Packages>
 					</Excluded_Packages>
 				</Delphi.Personality>
 				<Platforms>

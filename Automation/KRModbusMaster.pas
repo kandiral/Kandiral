@@ -12,68 +12,17 @@ unit KRModbusMaster;
 
 interface
 
-{$I '..\Includes\language.inc'}
-
 uses
   {$IF CompilerVersion >= 23}
-    Winapi.Windows, System.Classes, System.SysUtils,
+    Winapi.Windows, System.Classes, System.SysUtils, System.SyncObjs,
   {$ELSE}
-    Windows, Classes, SysUtils,
+    Windows, Classes, SysUtils, SyncObjs,
   {$IFEND}
-    KRConnector, KRModbus, KRTypes, KRThreadQueue, KRRuntimeErrors,
-    KRThread, lgop, KRCRC, funcs;
-
-type
-  TMBMError = integer;
+    KRConnector, KRModbus, KRModbusLng, KRModbusMasterLng, KRTypes, KRRuntimeErrors,
+    KRThreadEvent, KRCRC, lgop;
 
 const
-  MBM_ERRORS_COUNT = 12;
-
-  mbmeOk = TMBMError(0);
-  mbmeNotConnector = TMBMError(1);
-  mbmeIncorrectID = TMBMError(2);
-  mbmeIncorrectPackageLength = TMBMError(3);
-  mbmeCRC = TMBMError(4);
-  mbmeIncorrectFunction = TMBMError(5);
-  mbmeIncorrectMBPackageLength = TMBMError(6);
-  mbmeIncorrectDataLength = TMBMError(7);
-  mbmeQueueOverflowed = TMBMError(8);
-  mbmeTimeOut = TMBMError(9);
-  mbmeRealTimeError = TMBMError(10);
-  mbmeModbusNotActive = TMBMError(11);
-  mbmeClientNotActive = TMBMError(12);
-
-  MB_PARSER_ERRORS_MSG : array[0..MBM_ERRORS_COUNT] of String = (
-{$IFDEF RUSSIAN_LANGUAGE}
-    'Нет ошибок',
-    'Не подключен модуль передачи данных',
-    'Неверный идентификатор пакета',
-    'Неверная длина пакета',
-    'Ошибка контрольной суммы',
-    'Неверный номер функции',
-    'Неверная длина Modbus пакета',
-    'Неверная длина данных',
-    'Очередь переполнена',
-    'Таймаут',
-    'Ошибка времени выполнения',
-    'Обработчик протокола Modbus выключен',
-    'Modbus клиент отключен'
-{$ELSE}
-    'No errors',
-    'Communication module not connected',
-    'Invalid package ID',
-    'Invalid packet length',
-    'Checksum error',
-    'Invalid function number',
-    'Invalid Modbus packet length',
-    'Invalid data length',
-    'Queue is overflow',
-    'Timeout',
-    'Runtime error',
-    'Modbus protocol handler disabled',
-    'Modbus client disabled'
-{$ENDIF}
-  );
+  MBM_QUEUE_MAX_ITEMS = 255;
 
   //------ Modbus Master Functions ---------------------------------------------
   function MBMReadCoils(ADevAddr: byte; AStartCoil, ACount: Word;
@@ -199,9 +148,13 @@ type
   TKRModbusMaster = class(TComponent)
   private
     FConnector: TKRConnector;
+    CS: TCriticalSection;
+    FEvent: THandle;
+    FList: array[0..MBM_QUEUE_MAX_ITEMS-1] of Pointer;
+    FListPosIn, FListPosOut, FListCount: integer;
     FThread: TKRMBThread;
-    FQueue: TKRThreadQueue;
     FRuntimeErrorEv: TKRRuntimeErrorEv;
+    FCheckID: boolean;
     procedure SetConnector(const Value: TKRConnector);
     procedure SetActive(const Value: boolean);
     function GetActive: boolean;
@@ -209,14 +162,43 @@ type
     function GetRuntimeErrorEv: TKRRuntimeErrorEv;
     procedure SetRuntimeErrorEv(const Value: TKRRuntimeErrorEv);
     procedure DoRuntimeError(ADesc: String; E: Exception);
-    function GetWaitPauseTime: Cardinal;
-    function GetWaitTime: Cardinal;
-    procedure SetWaitPauseTime(const Value: Cardinal);
-    procedure SetWaitTime(const Value: Cardinal);
-    function GetCheckID: boolean;
-    procedure SetCheckID(const Value: boolean);
   protected
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
+    procedure ConnectorCB(AError: integer; APack: PKRBuffer; ALength: integer; AData: Pointer);
+
+    function chTCPReadCoils(APack: PKRBuffer; ALength: byte; var ABytes: TKRBytes): integer;
+    function chTCPReadDiscretInputs(APack: PKRBuffer; ALength: byte; var ABytes: TKRBytes): integer;
+    function chTCPReadHoldingRegisters(APack: PKRBuffer; ALength: byte; var ARegs: TKRRegisters): integer;
+    function chTCPReadInputRegisters(APack: PKRBuffer; ALength: byte; var ARegs: TKRRegisters): integer;
+    function chTCPUserFunction(APack: PKRBuffer; ALength: byte; var AData: TKRBytes): integer;
+    function chTCPReadStatus(APack: PKRBuffer; ALength: byte; var AStatus: Byte): integer;
+    function chTCPWriteHoldingRegister(APack: PKRBuffer; ALength: byte): integer;
+    function chTCPWriteCoil(APack: PKRBuffer; ALength: byte): integer;
+    function chTCPWriteCoils(APack: PKRBuffer; ALength: byte): integer;
+    function chTCPWriteHoldingRegisters(APack: PKRBuffer; ALength: byte): integer;
+
+    function chRTUReadCoils(APack: PKRBuffer; ALength: byte; var ABytes: TKRBytes): integer;
+    function chRTUReadDiscretInputs(APack: PKRBuffer; ALength: byte; var ABytes: TKRBytes): integer;
+    function chRTUReadHoldingRegisters(APack: PKRBuffer; ALength: byte; var ARegs: TKRRegisters): integer;
+    function chRTUReadInputRegisters(APack: PKRBuffer; ALength: byte; var ARegs: TKRRegisters): integer;
+    function chRTUUserFunction(APack: PKRBuffer; ALength: byte; var AData: TKRBytes): integer;
+    function chRTUReadStatus(APack: PKRBuffer; ALength: byte; var AStatus: Byte): integer;
+    function chRTUWriteCoil(APack: PKRBuffer; ALength: byte): integer;
+    function chRTUWriteCoils(APack: PKRBuffer; ALength: byte): integer;
+    function chRTUWriteHoldingRegister(APack: PKRBuffer; ALength: byte): integer;
+    function chRTUWriteHoldingRegisters(APack: PKRBuffer; ALength: byte): integer;
+
+    function chASCIIReadCoils(APack: PKRBuffer; ALength: byte; var ABytes: TKRBytes): integer;
+    function chASCIIReadDiscretInputs(APack: PKRBuffer; ALength: byte; var ABytes: TKRBytes): integer;
+    function chASCIIReadHoldingRegisters(APack: PKRBuffer; ALength: byte; var ARegs: TKRRegisters): integer;
+    function chASCIIReadInputRegisters(APack: PKRBuffer; ALength: byte; var ARegs: TKRRegisters): integer;
+    function chASCIIUserFunction(APack: PKRBuffer; ALength: byte; var AData: TKRBytes): integer;
+    function chASCIIReadStatus(APack: PKRBuffer; ALength: byte; var AStatus: Byte): integer;
+    function chASCIIWriteCoil(APack: PKRBuffer; ALength: byte): integer;
+    function chASCIIWriteCoils(APack: PKRBuffer; ALength: byte): integer;
+    function chASCIIWriteHoldingRegister(APack: PKRBuffer; ALength: byte): integer;
+    function chASCIIWriteHoldingRegisters(APack: PKRBuffer; ALength: byte): integer;
+
   public
     constructor Create(AOwner: TComponent);override;
     destructor Destroy;override;
@@ -277,18 +259,13 @@ type
   published
     property Connector: TKRConnector read FConnector write SetConnector;
     property OnRuntimeError: TKRRuntimeErrorEv read GetRuntimeErrorEv write SetRuntimeErrorEv;
-    property WaitTime: Cardinal read GetWaitTime write SetWaitTime default 20;
-    property WaitPauseTime: Cardinal read GetWaitPauseTime write SetWaitPauseTime default 1000;
-    property CheckID: boolean read GetCheckID write SetCheckID;
+    property CheckID: boolean read FCheckID write FCheckID;
   end;
 
-  TKRMBThread = class(TKRThread)
+  TKRMBThread = class(TKRThreadEvent)
   private
     F_ID: byte;
-    FQueue: TKRThreadQueue;
-    FCheckID: boolean;
     FModbus: TKRModbusMaster;
-    procedure _CallBack(AError: integer; APack: PKRBuffer; ALength: integer; AData: Pointer);
 
     procedure DoTCP(APack: PMBPack);
     procedure DoSendTCP(APack: PMBPack; APBuf: PKRBuffer; ABufLen: byte; ARecvLen: byte);
@@ -303,17 +280,6 @@ type
     procedure doTCPWriteHoldingRegister(APack: PMBPack);
     procedure doTCPWriteHoldingRegisters(APack: PMBPack);
 
-    function chTCPReadCoils(APack: PKRBuffer; ALength: byte; var ABytes: TKRBytes): integer;
-    function chTCPReadDiscretInputs(APack: PKRBuffer; ALength: byte; var ABytes: TKRBytes): integer;
-    function chTCPReadHoldingRegisters(APack: PKRBuffer; ALength: byte; var ARegs: TKRRegisters): integer;
-    function chTCPReadInputRegisters(APack: PKRBuffer; ALength: byte; var ARegs: TKRRegisters): integer;
-    function chTCPUserFunction(APack: PKRBuffer; ALength: byte; var AData: TKRBytes): integer;
-    function chTCPReadStatus(APack: PKRBuffer; ALength: byte; var AStatus: Byte): integer;
-    function chTCPWriteHoldingRegister(APack: PKRBuffer; ALength: byte): integer;
-    function chTCPWriteCoil(APack: PKRBuffer; ALength: byte): integer;
-    function chTCPWriteCoils(APack: PKRBuffer; ALength: byte): integer;
-    function chTCPWriteHoldingRegisters(APack: PKRBuffer; ALength: byte): integer;
-
     procedure DoRTU(APack: PMBPack);
     procedure DoSendRTU(APack: PMBPack; APBuf: PKRBuffer; ABufLen: byte; ARecvLen: byte);
     procedure doRTUReadCoils(APack: PMBPack);
@@ -326,17 +292,6 @@ type
     procedure doRTUWriteCoils(APack: PMBPack);
     procedure doRTUWriteHoldingRegister(APack: PMBPack);
     procedure doRTUWriteHoldingRegisters(APack: PMBPack);
-
-    function chRTUReadCoils(APack: PKRBuffer; ALength: byte; var ABytes: TKRBytes): integer;
-    function chRTUReadDiscretInputs(APack: PKRBuffer; ALength: byte; var ABytes: TKRBytes): integer;
-    function chRTUReadHoldingRegisters(APack: PKRBuffer; ALength: byte; var ARegs: TKRRegisters): integer;
-    function chRTUReadInputRegisters(APack: PKRBuffer; ALength: byte; var ARegs: TKRRegisters): integer;
-    function chRTUUserFunction(APack: PKRBuffer; ALength: byte; var AData: TKRBytes): integer;
-    function chRTUReadStatus(APack: PKRBuffer; ALength: byte; var AStatus: Byte): integer;
-    function chRTUWriteCoil(APack: PKRBuffer; ALength: byte): integer;
-    function chRTUWriteCoils(APack: PKRBuffer; ALength: byte): integer;
-    function chRTUWriteHoldingRegister(APack: PKRBuffer; ALength: byte): integer;
-    function chRTUWriteHoldingRegisters(APack: PKRBuffer; ALength: byte): integer;
 
     procedure DoASCII(APack: PMBPack);
     procedure DoSendASCII(APack: PMBPack; APBuf: PKRBuffer; ABufLen: byte; ARecvLen: byte);
@@ -351,22 +306,11 @@ type
     procedure doASCIIWriteHoldingRegister(APack: PMBPack);
     procedure doASCIIWriteHoldingRegisters(APack: PMBPack);
 
-    function chASCIIReadCoils(APack: PKRBuffer; ALength: byte; var ABytes: TKRBytes): integer;
-    function chASCIIReadDiscretInputs(APack: PKRBuffer; ALength: byte; var ABytes: TKRBytes): integer;
-    function chASCIIReadHoldingRegisters(APack: PKRBuffer; ALength: byte; var ARegs: TKRRegisters): integer;
-    function chASCIIReadInputRegisters(APack: PKRBuffer; ALength: byte; var ARegs: TKRRegisters): integer;
-    function chASCIIUserFunction(APack: PKRBuffer; ALength: byte; var AData: TKRBytes): integer;
-    function chASCIIReadStatus(APack: PKRBuffer; ALength: byte; var AStatus: Byte): integer;
-    function chASCIIWriteCoil(APack: PKRBuffer; ALength: byte): integer;
-    function chASCIIWriteCoils(APack: PKRBuffer; ALength: byte): integer;
-    function chASCIIWriteHoldingRegister(APack: PKRBuffer; ALength: byte): integer;
-    function chASCIIWriteHoldingRegisters(APack: PKRBuffer; ALength: byte): integer;
-
   protected
     procedure _exec(APack: PMBPack);
     procedure KRExecute; override;
   public
-    constructor CreateTh(AModbus: TKRModbusMaster; AQueue: TKRThreadQueue);
+    constructor CreateTh(AModbus: TKRModbusMaster);
     destructor Destroy;override;
   end;
 
@@ -729,26 +673,23 @@ end;
 function MBMASCIIReadCoils(ADevAddr: byte; AStartCoil, ACount: Word;
     ABuffer: PKRBuffer; out ARecvLen: Byte): Byte;
 var
-  p: PKRBuffer;
-  i: integer;
-  wd: Word;
-  bt: byte;
+  i,n: integer;
+  crc: byte;
 begin
-  ABuffer^[0]:=58;
-  New(p);
-  Result:=MBMReadCoils(ADevAddr,AStartCoil,ACount,0,p,ARecvLen);
-  wd:=0;
-  for i := 0 to Result-1 do begin
-    wd:=WordRec(wd).Lo + p^[i];
-    ABuffer^[i*2+1]:=MBHEX_CHARS[p^[i] shr 4];
-    ABuffer^[i*2+2]:=MBHEX_CHARS[p^[i] and $F]
+  Result:=MBMReadCoils(ADevAddr,AStartCoil,ACount,0,ABuffer,ARecvLen);
+  crc:=0;
+  n:=Result-1;
+  for i := n downto 0 do begin
+    inc(crc,ABuffer^[i]);
+    ABuffer^[i*2+1]:=MBHEX_CHARS[ABuffer^[i] shr 4];
+    ABuffer^[i*2+2]:=MBHEX_CHARS[ABuffer^[i] and $F]
   end;
-  Dispose(p);
+  crc:=(crc xor $FF)+1;
+  ABuffer^[0]:=58;
   Result:=Result*2+1;
-  bt:=$ff-WordRec(wd).Lo;
-  ABuffer^[Result]:=MBHEX_CHARS[bt shr 4];
+  ABuffer^[Result]:=MBHEX_CHARS[crc shr 4];
   Inc(Result);
-  ABuffer^[Result]:=MBHEX_CHARS[bt and $F];
+  ABuffer^[Result]:=MBHEX_CHARS[crc and $F];
   Inc(Result);
   ABuffer^[Result]:=13;
   Inc(Result);
@@ -760,26 +701,23 @@ end;
 function MBMASCIIReadDiscretInputs(ADevAddr: byte; AStartInput, ACount: Word;
     ABuffer: PKRBuffer; out ARecvLen: Byte): Byte;
 var
-  p: PKRBuffer;
-  i: integer;
-  wd: Word;
-  bt: byte;
+  i,n: integer;
+  crc: byte;
 begin
-  ABuffer^[0]:=58;
-  New(p);
-  Result:=MBMReadDiscretInputs(ADevAddr,AStartInput,ACount,0,p,ARecvLen);
-  wd:=0;
-  for i := 0 to Result-1 do begin
-    wd:=WordRec(wd).Lo + p^[i];
-    ABuffer^[i*2+1]:=MBHEX_CHARS[p^[i] shr 4];
-    ABuffer^[i*2+2]:=MBHEX_CHARS[p^[i] and $F]
+  Result:=MBMReadDiscretInputs(ADevAddr,AStartInput,ACount,0,ABuffer,ARecvLen);
+  crc:=0;
+  n:=Result-1;
+  for i := n downto 0 do begin
+    inc(crc,ABuffer^[i]);
+    ABuffer^[i*2+1]:=MBHEX_CHARS[ABuffer^[i] shr 4];
+    ABuffer^[i*2+2]:=MBHEX_CHARS[ABuffer^[i] and $F]
   end;
-  Dispose(p);
+  crc:=(crc xor $FF)+1;
+  ABuffer^[0]:=58;
   Result:=Result*2+1;
-  bt:=$ff-WordRec(wd).Lo;
-  ABuffer^[Result]:=MBHEX_CHARS[bt shr 4];
+  ABuffer^[Result]:=MBHEX_CHARS[crc shr 4];
   Inc(Result);
-  ABuffer^[Result]:=MBHEX_CHARS[bt and $F];
+  ABuffer^[Result]:=MBHEX_CHARS[crc and $F];
   Inc(Result);
   ABuffer^[Result]:=13;
   Inc(Result);
@@ -791,26 +729,23 @@ end;
 function MBMASCIIReadHoldingRegisters(ADevAddr: byte; AStartReg, ACount: Word;
     ABuffer: PKRBuffer; out ARecvLen: Byte): Byte;
 var
-  p: PKRBuffer;
-  i: integer;
-  wd: Word;
-  bt: byte;
+  i,n: integer;
+  crc: byte;
 begin
-  ABuffer^[0]:=58;
-  New(p);
-  Result:=MBMReadHoldingRegisters(ADevAddr,AStartReg,ACount,0,p,ARecvLen);
-  wd:=0;
-  for i := 0 to Result-1 do begin
-    wd:=WordRec(wd).Lo + p^[i];
-    ABuffer^[i*2+1]:=MBHEX_CHARS[p^[i] shr 4];
-    ABuffer^[i*2+2]:=MBHEX_CHARS[p^[i] and $F]
+  Result:=MBMReadHoldingRegisters(ADevAddr,AStartReg,ACount,0,ABuffer,ARecvLen);
+  crc:=0;
+  n:=Result-1;
+  for i := n downto 0 do begin
+    inc(crc,ABuffer^[i]);
+    ABuffer^[i*2+1]:=MBHEX_CHARS[ABuffer^[i] shr 4];
+    ABuffer^[i*2+2]:=MBHEX_CHARS[ABuffer^[i] and $F]
   end;
-  Dispose(p);
-  Result:=Result*2+1;
-  bt:=$ff-WordRec(wd).Lo;
-  ABuffer^[Result]:=MBHEX_CHARS[bt shr 4];
+  crc:=(crc xor $FF)+1;
+  ABuffer^[0]:=58;
+  Result:=Result+Result+1;
+  ABuffer^[Result]:=MBHEX_CHARS[crc shr 4];
   Inc(Result);
-  ABuffer^[Result]:=MBHEX_CHARS[bt and $F];
+  ABuffer^[Result]:=MBHEX_CHARS[crc and $F];
   Inc(Result);
   ABuffer^[Result]:=13;
   Inc(Result);
@@ -822,26 +757,23 @@ end;
 function MBMASCIIReadInputRegisters(ADevAddr: byte; AStartReg, ACount: Word;
     ABuffer: PKRBuffer; out ARecvLen: Byte): Byte;
 var
-  p: PKRBuffer;
-  i: integer;
-  wd: Word;
-  bt: byte;
+  i,n: integer;
+  crc: byte;
 begin
-  ABuffer^[0]:=58;
-  New(p);
-  Result:=MBMReadInputRegisters(ADevAddr,AStartReg,ACount,0,p,ARecvLen);
-  wd:=0;
-  for i := 0 to Result-1 do begin
-    wd:=WordRec(wd).Lo + p^[i];
-    ABuffer^[i*2+1]:=MBHEX_CHARS[p^[i] shr 4];
-    ABuffer^[i*2+2]:=MBHEX_CHARS[p^[i] and $F]
+  Result:=MBMReadInputRegisters(ADevAddr,AStartReg,ACount,0,ABuffer,ARecvLen);
+  crc:=0;
+  n:=Result-1;
+  for i := n downto 0 do begin
+    inc(crc,ABuffer^[i]);
+    ABuffer^[i*2+1]:=MBHEX_CHARS[ABuffer^[i] shr 4];
+    ABuffer^[i*2+2]:=MBHEX_CHARS[ABuffer^[i] and $F]
   end;
-  Dispose(p);
-  Result:=Result*2+1;
-  bt:=$ff-WordRec(wd).Lo;
-  ABuffer^[Result]:=MBHEX_CHARS[bt shr 4];
+  crc:=(crc xor $FF)+1;
+  ABuffer^[0]:=58;
+  Result:=Result+Result+1;
+  ABuffer^[Result]:=MBHEX_CHARS[crc shr 4];
   Inc(Result);
-  ABuffer^[Result]:=MBHEX_CHARS[bt and $F];
+  ABuffer^[Result]:=MBHEX_CHARS[crc and $F];
   Inc(Result);
   ABuffer^[Result]:=13;
   Inc(Result);
@@ -853,26 +785,23 @@ end;
 function MBMASCIIReadStatus(ADevAddr: byte; ABuffer: PKRBuffer;
     out ARecvLen: Byte): Byte;
 var
-  p: PKRBuffer;
-  i: integer;
-  wd: Word;
-  bt: byte;
+  i,n: integer;
+  crc: byte;
 begin
-  ABuffer^[0]:=58;
-  New(p);
-  Result:=MBMReadStatus(ADevAddr,0,p,ARecvLen);
-  wd:=0;
-  for i := 0 to Result-1 do begin
-    wd:=WordRec(wd).Lo + p^[i];
-    ABuffer^[i*2+1]:=MBHEX_CHARS[p^[i] shr 4];
-    ABuffer^[i*2+2]:=MBHEX_CHARS[p^[i] and $F]
+  Result:=MBMReadStatus(ADevAddr,0,ABuffer,ARecvLen);
+  crc:=0;
+  n:=Result-1;
+  for i := n downto 0 do begin
+    inc(crc,ABuffer^[i]);
+    ABuffer^[i*2+1]:=MBHEX_CHARS[ABuffer^[i] shr 4];
+    ABuffer^[i*2+2]:=MBHEX_CHARS[ABuffer^[i] and $F]
   end;
-  Dispose(p);
-  Result:=Result*2+1;
-  bt:=$ff-WordRec(wd).Lo;
-  ABuffer^[Result]:=MBHEX_CHARS[bt shr 4];
+  crc:=(crc xor $FF)+1;
+  ABuffer^[0]:=58;
+  Result:=Result+Result+1;
+  ABuffer^[Result]:=MBHEX_CHARS[crc shr 4];
   Inc(Result);
-  ABuffer^[Result]:=MBHEX_CHARS[bt and $F];
+  ABuffer^[Result]:=MBHEX_CHARS[crc and $F];
   Inc(Result);
   ABuffer^[Result]:=13;
   Inc(Result);
@@ -885,26 +814,23 @@ end;
 function MBMASCIIUserFunction(ADevAddr: byte; AFunc: byte; AData: PKRBuffer;
     ADataLen: integer; ABuffer: PKRBuffer): Byte;
 var
-  p: PKRBuffer;
-  i: integer;
-  wd: Word;
-  bt: byte;
+  i,n: integer;
+  crc: byte;
 begin
-  ABuffer^[0]:=58;
-  New(p);
-  Result:=MBMUserFunction(ADevAddr,AFunc,AData,ADataLen,0,p);
-  wd:=0;
-  for i := 0 to Result-1 do begin
-    wd:=WordRec(wd).Lo + p^[i];
-    ABuffer^[i*2+1]:=MBHEX_CHARS[p^[i] shr 4];
-    ABuffer^[i*2+2]:=MBHEX_CHARS[p^[i] and $F]
+  Result:=MBMUserFunction(ADevAddr,AFunc,AData,ADataLen,0,ABuffer);
+  crc:=0;
+  n:=Result-1;
+  for i := n downto 0 do begin
+    inc(crc,ABuffer^[i]);
+    ABuffer^[i*2+1]:=MBHEX_CHARS[ABuffer^[i] shr 4];
+    ABuffer^[i*2+2]:=MBHEX_CHARS[ABuffer^[i] and $F]
   end;
-  Dispose(p);
-  Result:=Result*2+1;
-  bt:=$ff-WordRec(wd).Lo;
-  ABuffer^[Result]:=MBHEX_CHARS[bt shr 4];
+  crc:=(crc xor $FF)+1;
+  ABuffer^[0]:=58;
+  Result:=Result+Result+1;
+  ABuffer^[Result]:=MBHEX_CHARS[crc shr 4];
   Inc(Result);
-  ABuffer^[Result]:=MBHEX_CHARS[bt and $F];
+  ABuffer^[Result]:=MBHEX_CHARS[crc and $F];
   Inc(Result);
   ABuffer^[Result]:=13;
   Inc(Result);
@@ -915,26 +841,23 @@ end;
 function MBMASCIIWriteCoil(ADevAddr: byte; ACoilNum: Word;
     AData: boolean; ABuffer: PKRBuffer; out ARecvLen: Byte): Byte;
 var
-  p: PKRBuffer;
-  i: integer;
-  wd: Word;
-  bt: byte;
+  i,n: integer;
+  crc: byte;
 begin
-  ABuffer^[0]:=58;
-  New(p);
-  Result:=MBMWriteCoil(ADevAddr,ACoilNum,AData,0,p,ARecvLen);
-  wd:=0;
-  for i := 0 to Result-1 do begin
-    wd:=WordRec(wd).Lo + p^[i];
-    ABuffer^[i*2+1]:=MBHEX_CHARS[p^[i] shr 4];
-    ABuffer^[i*2+2]:=MBHEX_CHARS[p^[i] and $F]
+  Result:=MBMWriteCoil(ADevAddr,ACoilNum,AData,0,ABuffer,ARecvLen);
+  crc:=0;
+  n:=Result-1;
+  for i := n downto 0 do begin
+    inc(crc,ABuffer^[i]);
+    ABuffer^[i*2+1]:=MBHEX_CHARS[ABuffer^[i] shr 4];
+    ABuffer^[i*2+2]:=MBHEX_CHARS[ABuffer^[i] and $F]
   end;
-  Dispose(p);
-  Result:=Result*2+1;
-  bt:=$ff-WordRec(wd).Lo;
-  ABuffer^[Result]:=MBHEX_CHARS[bt shr 4];
+  crc:=(crc xor $FF)+1;
+  ABuffer^[0]:=58;
+  Result:=Result+Result+1;
+  ABuffer^[Result]:=MBHEX_CHARS[crc shr 4];
   Inc(Result);
-  ABuffer^[Result]:=MBHEX_CHARS[bt and $F];
+  ABuffer^[Result]:=MBHEX_CHARS[crc and $F];
   Inc(Result);
   ABuffer^[Result]:=13;
   Inc(Result);
@@ -946,26 +869,23 @@ end;
 function MBMASCIIWriteCoils(ADevAddr: byte; AStartCoil, ACount: Word;
     AData: TKRBytes; ABuffer: PKRBuffer; out ARecvLen: Byte): Byte;
 var
-  p: PKRBuffer;
-  i: integer;
-  wd: Word;
-  bt: byte;
+  i,n: integer;
+  crc: byte;
 begin
-  ABuffer^[0]:=58;
-  New(p);
-  Result:=MBMWriteCoils(ADevAddr,AStartCoil,ACount,AData,0,p,ARecvLen);
-  wd:=0;
-  for i := 0 to Result-1 do begin
-    wd:=WordRec(wd).Lo + p^[i];
-    ABuffer^[i*2+1]:=MBHEX_CHARS[p^[i] shr 4];
-    ABuffer^[i*2+2]:=MBHEX_CHARS[p^[i] and $F]
+  Result:=MBMWriteCoils(ADevAddr,AStartCoil,ACount,AData,0,ABuffer,ARecvLen);
+  crc:=0;
+  n:=Result-1;
+  for i := n downto 0 do begin
+    inc(crc,ABuffer^[i]);
+    ABuffer^[i*2+1]:=MBHEX_CHARS[ABuffer^[i] shr 4];
+    ABuffer^[i*2+2]:=MBHEX_CHARS[ABuffer^[i] and $F]
   end;
-  Dispose(p);
-  Result:=Result*2+1;
-  bt:=$ff-WordRec(wd).Lo;
-  ABuffer^[Result]:=MBHEX_CHARS[bt shr 4];
+  crc:=(crc xor $FF)+1;
+  ABuffer^[0]:=58;
+  Result:=Result+Result+1;
+  ABuffer^[Result]:=MBHEX_CHARS[crc shr 4];
   Inc(Result);
-  ABuffer^[Result]:=MBHEX_CHARS[bt and $F];
+  ABuffer^[Result]:=MBHEX_CHARS[crc and $F];
   Inc(Result);
   ABuffer^[Result]:=13;
   Inc(Result);
@@ -977,26 +897,23 @@ end;
 function MBMASCIIWriteHoldingRegister(ADevAddr: byte; AStartReg: Word;
     AData: Word; ABuffer: PKRBuffer; out ARecvLen: Byte): Byte;
 var
-  p: PKRBuffer;
-  i: integer;
-  wd: Word;
-  bt: byte;
+  i,n: integer;
+  crc: byte;
 begin
-  ABuffer^[0]:=58;
-  New(p);
-  Result:=MBMWriteHoldingRegister(ADevAddr,AStartReg,AData,0,p,ARecvLen);
-  wd:=0;
-  for i := 0 to Result-1 do begin
-    wd:=WordRec(wd).Lo + p^[i];
-    ABuffer^[i*2+1]:=MBHEX_CHARS[p^[i] shr 4];
-    ABuffer^[i*2+2]:=MBHEX_CHARS[p^[i] and $F]
+  Result:=MBMWriteHoldingRegister(ADevAddr,AStartReg,AData,0,ABuffer,ARecvLen);
+  crc:=0;
+  n:=Result-1;
+  for i := n downto 0 do begin
+    inc(crc,ABuffer^[i]);
+    ABuffer^[i*2+1]:=MBHEX_CHARS[ABuffer^[i] shr 4];
+    ABuffer^[i*2+2]:=MBHEX_CHARS[ABuffer^[i] and $F]
   end;
-  Dispose(p);
-  Result:=Result*2+1;
-  bt:=$ff-WordRec(wd).Lo;
-  ABuffer^[Result]:=MBHEX_CHARS[bt shr 4];
+  crc:=(crc xor $FF)+1;
+  ABuffer^[0]:=58;
+  Result:=Result+Result+1;
+  ABuffer^[Result]:=MBHEX_CHARS[crc shr 4];
   Inc(Result);
-  ABuffer^[Result]:=MBHEX_CHARS[bt and $F];
+  ABuffer^[Result]:=MBHEX_CHARS[crc and $F];
   Inc(Result);
   ABuffer^[Result]:=13;
   Inc(Result);
@@ -1008,26 +925,23 @@ end;
 function MBMASCIIWriteHoldingRegisters(ADevAddr: byte; AStartReg: Word;
     AData: TKRRegisters; ABuffer: PKRBuffer; out ARecvLen: Byte): Byte;
 var
-  p: PKRBuffer;
-  i: integer;
-  wd: Word;
-  bt: byte;
+  i,n: integer;
+  crc: byte;
 begin
-  ABuffer^[0]:=58;
-  New(p);
-  Result:=MBMWriteHoldingRegisters(ADevAddr,AStartReg,AData,0,p,ARecvLen);
-  wd:=0;
-  for i := 0 to Result-1 do begin
-    wd:=WordRec(wd).Lo + p^[i];
-    ABuffer^[i*2+1]:=MBHEX_CHARS[p^[i] shr 4];
-    ABuffer^[i*2+2]:=MBHEX_CHARS[p^[i] and $F]
+  Result:=MBMWriteHoldingRegisters(ADevAddr,AStartReg,AData,0,ABuffer,ARecvLen);
+  crc:=0;
+  n:=Result-1;
+  for i := n downto 0 do begin
+    inc(crc,ABuffer^[i]);
+    ABuffer^[i*2+1]:=MBHEX_CHARS[ABuffer^[i] shr 4];
+    ABuffer^[i*2+2]:=MBHEX_CHARS[ABuffer^[i] and $F]
   end;
-  Dispose(p);
-  Result:=Result*2+1;
-  bt:=$ff-WordRec(wd).Lo;
-  ABuffer^[Result]:=MBHEX_CHARS[bt shr 4];
+  crc:=(crc xor $FF)+1;
+  ABuffer^[0]:=58;
+  Result:=Result+Result+1;
+  ABuffer^[Result]:=MBHEX_CHARS[crc shr 4];
   Inc(Result);
-  ABuffer^[Result]:=MBHEX_CHARS[bt and $F];
+  ABuffer^[Result]:=MBHEX_CHARS[crc and $F];
   Inc(Result);
   ABuffer^[Result]:=13;
   Inc(Result);
@@ -1038,19 +952,459 @@ end;
 
 { TKRModbusMaster }
 
+function TKRModbusMaster.chASCIIReadCoils(APack: PKRBuffer; ALength: byte;
+  var ABytes: TKRBytes): integer;
+var
+  n,i: integer;
+begin
+  Result:=0;
+  n:=MBHexToValue(APack^[5],APack^[6]);
+  SetLength(ABytes,n);
+  for i := 0 to n-1 do ABytes[i]:=MBHexToValue(APack^[i*2+6],APack^[i*2+7]);
+end;
+
+function TKRModbusMaster.chASCIIReadDiscretInputs(APack: PKRBuffer; ALength: byte;
+  var ABytes: TKRBytes): integer;
+var
+  n,i: integer;
+begin
+  Result:=0;
+  n:=MBHexToValue(APack^[5],APack^[6]);
+  SetLength(ABytes,n);
+  for i := 0 to n-1 do ABytes[i]:=MBHexToValue(APack^[i*2+6],APack^[i*2+7]);
+end;
+
+function TKRModbusMaster.chASCIIReadHoldingRegisters(APack: PKRBuffer;
+  ALength: byte; var ARegs: TKRRegisters): integer;
+var
+  n, i: integer;
+begin
+  Result:=0;
+  n:=MBHexToValue(APack^[5],APack^[6]) div 2;
+  if n<1 then begin
+    SetLength(ARegs,1);
+    ARegs[0]:=0;
+  end else begin
+    SetLength(ARegs,n);
+    for i := 0 to n-1 do
+      ARegs[i]:=BytesToWord(
+        MBHexToValue(APack^[i*4+9],APack^[i*4+10]),
+        MBHexToValue(APack^[i*4+7],APack^[i*4+8])
+      );
+  end;
+end;
+
+function TKRModbusMaster.chASCIIReadInputRegisters(APack: PKRBuffer; ALength: byte;
+  var ARegs: TKRRegisters): integer;
+var
+  n, i: integer;
+begin
+  Result:=0;
+  n:=MBHexToValue(APack^[5],APack^[6]) div 2;
+  if n<1 then begin
+    SetLength(ARegs,1);
+    ARegs[0]:=0;
+  end else begin
+    SetLength(ARegs,n);
+    for i := 0 to n-1 do
+      ARegs[i]:=BytesToWord(
+        MBHexToValue(APack^[i*4+9],APack^[i*4+10]),
+        MBHexToValue(APack^[i*4+7],APack^[i*4+8])
+      );
+  end;
+end;
+
+function TKRModbusMaster.chASCIIReadStatus(APack: PKRBuffer; ALength: byte;
+  var AStatus: Byte): integer;
+begin
+  Result:=0;
+  AStatus:=MBHexToValue(APack^[5],APack^[6]);
+end;
+
+function TKRModbusMaster.chASCIIUserFunction(APack: PKRBuffer; ALength: byte;
+  var AData: TKRBytes): integer;
+var
+  i, n: integer;
+begin
+  Result:=0;
+  n:=ALength-2;
+  if n<0 then n:=0;
+  SetLength(AData,n);
+  for i := 0 to n-1 do AData[i]:=MBHexToValue(APack^[i*2+5],APack^[i*2+6]);
+end;
+
+function TKRModbusMaster.chASCIIWriteCoil(APack: PKRBuffer; ALength: byte): integer;
+begin
+  Result:=0;
+end;
+
+function TKRModbusMaster.chASCIIWriteCoils(APack: PKRBuffer; ALength: byte): integer;
+begin
+  Result:=0;
+end;
+
+function TKRModbusMaster.chASCIIWriteHoldingRegister(APack: PKRBuffer;
+  ALength: byte): integer;
+begin
+  Result:=0;
+end;
+
+function TKRModbusMaster.chASCIIWriteHoldingRegisters(APack: PKRBuffer;
+  ALength: byte): integer;
+begin
+  Result:=0;
+end;
+
+function TKRModbusMaster.chRTUReadCoils(APack: PKRBuffer; ALength: byte;
+  var ABytes: TKRBytes): integer;
+var
+  i: integer;
+begin
+  Result:=0;
+  SetLength(ABytes,APack^[2]);
+  for i := 0 to APack^[2]-1 do ABytes[i]:=APack^[3+i];
+end;
+
+function TKRModbusMaster.chRTUReadDiscretInputs(APack: PKRBuffer; ALength: byte;
+  var ABytes: TKRBytes): integer;
+var
+  i: integer;
+begin
+  Result:=0;
+  SetLength(ABytes,APack^[2]);
+  for i := 0 to APack^[2]-1 do ABytes[i]:=APack^[3+i];
+end;
+
+function TKRModbusMaster.chRTUReadHoldingRegisters(APack: PKRBuffer; ALength: byte;
+  var ARegs: TKRRegisters): integer;
+var
+  n, i: integer;
+begin
+  Result:=0;
+  n:=APack^[2] div 2;
+  if n<1 then begin
+    SetLength(ARegs,1);
+    ARegs[0]:=0;
+  end else begin
+    SetLength(ARegs,n);
+    for i := 0 to n-1 do ARegs[i]:=BytesToWord(APack^[4+i*2],APack^[3+i*2]);
+  end;
+end;
+
+function TKRModbusMaster.chRTUReadInputRegisters(APack: PKRBuffer; ALength: byte;
+  var ARegs: TKRRegisters): integer;
+var
+  n, i: integer;
+begin
+  Result:=0;
+  n:=APack^[2] div 2;
+  if n<1 then begin
+    SetLength(ARegs,1);
+    ARegs[0]:=0;
+  end else begin
+    SetLength(ARegs,n);
+    for i := 0 to n-1 do ARegs[i]:=BytesToWord(APack^[4+i*2],APack^[3+i*2]);
+  end;
+end;
+
+function TKRModbusMaster.chRTUReadStatus(APack: PKRBuffer; ALength: byte;
+  var AStatus: Byte): integer;
+begin
+  Result:=0;
+  AStatus:=APack^[2];
+end;
+
+function TKRModbusMaster.chRTUUserFunction(APack: PKRBuffer; ALength: byte;
+  var AData: TKRBytes): integer;
+var
+  i, n: integer;
+begin
+  Result:=0;
+  n:=ALength-2;
+  if n<0 then n:=0;
+  SetLength(AData,n);
+  for i := 0 to n-1 do AData[i]:=APack^[i+2];
+end;
+
+function TKRModbusMaster.chRTUWriteCoil(APack: PKRBuffer; ALength: byte): integer;
+begin
+  Result:=0;
+end;
+
+function TKRModbusMaster.chRTUWriteCoils(APack: PKRBuffer; ALength: byte): integer;
+begin
+  Result:=0;
+end;
+
+function TKRModbusMaster.chRTUWriteHoldingRegister(APack: PKRBuffer; ALength: byte): integer;
+begin
+  Result:=0;
+end;
+
+function TKRModbusMaster.chRTUWriteHoldingRegisters(APack: PKRBuffer; ALength: byte): integer;
+begin
+  Result:=0;
+end;
+
+function TKRModbusMaster.chTCPReadCoils(APack: PKRBuffer; ALength: byte;
+  var ABytes: TKRBytes): integer;
+var
+  i: integer;
+begin
+  Result:=0;
+  SetLength(ABytes,APack^[8]);
+  for i := 0 to APack^[8]-1 do ABytes[i]:=APack^[9+i];
+end;
+
+function TKRModbusMaster.chTCPReadDiscretInputs(APack: PKRBuffer; ALength: byte;
+  var ABytes: TKRBytes): integer;
+var
+  i: integer;
+begin
+  Result:=0;
+  SetLength(ABytes,APack^[8]);
+  for i := 0 to APack^[8]-1 do ABytes[i]:=APack^[9+i];
+end;
+
+function TKRModbusMaster.chTCPReadHoldingRegisters(APack: PKRBuffer;
+  ALength: byte; var ARegs: TKRRegisters): integer;
+var
+  n, i: integer;
+begin
+  Result:=0;
+  n:=APack^[8] div 2;
+  if n<1 then begin
+    SetLength(ARegs,1);
+    ARegs[0]:=0;
+  end else begin
+    SetLength(ARegs,n);
+    for i := 0 to n-1 do ARegs[i]:=BytesToWord(APack^[10+i*2],APack^[9+i*2]);
+  end;
+end;
+
+function TKRModbusMaster.chTCPReadInputRegisters(APack: PKRBuffer;
+  ALength: byte; var ARegs: TKRRegisters): integer;
+var
+  n, i: integer;
+begin
+  Result:=0;
+  n:=APack^[8] div 2;
+  if n<1 then begin
+    SetLength(ARegs,1);
+    ARegs[0]:=0;
+  end else begin
+    SetLength(ARegs,n);
+    for i := 0 to n-1 do ARegs[i]:=BytesToWord(APack^[10+i*2],APack^[9+i*2]);
+  end;
+end;
+
+function TKRModbusMaster.chTCPReadStatus(APack: PKRBuffer; ALength: byte;
+  var AStatus: Byte): integer;
+begin
+  Result:=0;
+  AStatus:=APack^[8];
+end;
+
+function TKRModbusMaster.chTCPUserFunction(APack: PKRBuffer; ALength: byte;
+  var AData: TKRBytes): integer;
+var
+  i, n: integer;
+begin
+  Result:=0;
+  n:=ALength-8;
+  if n<0 then n:=0;
+  SetLength(AData,n);
+  for i := 0 to n-1 do AData[i]:=APack^[i+8];
+end;
+
+function TKRModbusMaster.chTCPWriteCoil(APack: PKRBuffer; ALength: byte): integer;
+begin
+  Result:=0;
+end;
+
+function TKRModbusMaster.chTCPWriteCoils(APack: PKRBuffer; ALength: byte): integer;
+begin
+  Result:=0;
+end;
+
+function TKRModbusMaster.chTCPWriteHoldingRegister(APack: PKRBuffer;
+  ALength: byte): integer;
+begin
+  Result:=0;
+end;
+
+function TKRModbusMaster.chTCPWriteHoldingRegisters(APack: PKRBuffer;
+  ALength: byte): integer;
+begin
+  Result:=0;
+end;
+
+procedure TKRModbusMaster.ConnectorCB(AError: integer; APack: PKRBuffer;
+  ALength: integer; AData: Pointer);
+var
+  _Data: PMBPack;
+  _Regs: TKRRegisters;
+  _err: integer;
+  _DataBt: TKRBytes;
+  bt: byte;
+  p: pointer;
+begin
+  CS.Enter;
+  try
+    if FThread=nil then exit;
+
+    _Data:=AData;
+    try
+      if not Assigned(_Data^.CallBack) then exit;
+      p:=nil;
+      if AError<>0 then _err:=AError*-1-100 else begin
+        case _Data^.MBType of
+          mbtTCP: begin
+            if FCheckID and(_Data^.id<>APack^[0]) then _err:=-mbmeIncorrectID else begin
+              if APack^[7] AND $7F <> _Data^.MBFunc then _err:=-mbmeIncorrectFunction else begin
+                if GetBit(APack^[7],7) then _err:=APack^[8] else begin
+                  case _Data^.MBFunc of
+                    mbfReadCoils: begin
+                      _err:=chTCPReadCoils(APack, ALength, _DataBt);
+                      p:=@_DataBt;
+                    end;
+                    mbfReadDiscretInputs: begin
+                      _err:=chTCPReadDiscretInputs(APack, ALength, _DataBt);
+                      p:=@_DataBt;
+                    end;
+                    mbfReadHoldingRegisters: begin
+                      _err:=chTCPReadHoldingRegisters(APack, ALength, _Regs);
+                      p:=@_Regs;
+                    end;
+                    mbfReadInputRegisters: begin
+                      _err:=chTCPReadInputRegisters(APack, ALength, _Regs);
+                      p:=@_Regs;
+                    end;
+                    mbfReadStatus: begin
+                      _err:=chTCPReadStatus(APack, ALength, bt);
+                      p:=@bt;
+                    end;
+                    mbfWriteCoil: _err:=chTCPWriteCoil(APack, ALength);
+                    mbfWriteCoils: _err:=chTCPWriteCoils(APack, ALength);
+                    mbfWriteHoldingRegister: _err:=chTCPWriteHoldingRegister(APack, ALength);
+                    mbfWriteHoldingRegisters: _err:=chTCPWriteHoldingRegisters(APack, ALength)
+                    else begin
+                      _err:=chTCPUserFunction(APack, ALength, _DataBt);
+                      p:=@_DataBt;
+                    end;
+                  end;
+                end;
+              end;
+            end;
+          end;
+          mbtRTU: begin
+            if KRCRC16(APack,ALength-2)<>BytesToWord(APack^[ALength-1],APack^[ALength-2]) then _err:=-mbmeCRC else begin
+              if APack^[1] AND $7F <> _Data^.MBFunc then _err:=-mbmeIncorrectFunction else begin
+                if GetBit(APack^[1],7) then _err:=APack^[2] else begin
+                  case _Data^.MBFunc of
+                    mbfReadCoils: begin
+                      _err:=chRTUReadCoils(APack, ALength, _DataBt);
+                      p:=@_DataBt;
+                    end;
+                    mbfReadDiscretInputs: begin
+                      _err:=chRTUReadDiscretInputs(APack, ALength, _DataBt);
+                      p:=@_DataBt;
+                    end;
+                    mbfReadHoldingRegisters: begin
+                      _err:=chRTUReadHoldingRegisters(APack, ALength, _Regs);
+                      p:=@_Regs;
+                    end;
+                    mbfReadInputRegisters: begin
+                      _err:=chRTUReadInputRegisters(APack, ALength, _Regs);
+                      p:=@_Regs;
+                    end;
+                    mbfReadStatus: begin
+                      _err:=chRTUReadStatus(APack, ALength, bt);
+                      p:=@bt;
+                    end;
+                    mbfWriteCoil: _err:=chRTUWriteCoil(APack, ALength);
+                    mbfWriteCoils: _err:=chRTUWriteCoils(APack, ALength);
+                    mbfWriteHoldingRegister: _err:=chRTUWriteHoldingRegister(APack, ALength);
+                    mbfWriteHoldingRegisters: _err:=chRTUWriteHoldingRegisters(APack, ALength)
+                    else begin
+                      _err:=chRTUUserFunction(APack, ALength, _DataBt);
+                      p:=@_DataBt;
+                    end;
+                  end;
+                end;
+              end;
+            end;
+          end else begin // mbtASCII
+            if MBLRC(APack,ALength)<>MBHexToValue(APack^[ALength-4],APack^[ALength-3])then _err:=-mbmeCRC else begin
+              bt:=MBHexToValue(APack^[3],APack^[4]);
+              if bt AND $7F <> _Data^.MBFunc then _err:=-mbmeIncorrectFunction else begin
+                if GetBit(bt,7) then _err:=MBHexToValue(APack^[5],APack^[6]) else begin
+                  case _Data^.MBFunc of
+                    mbfReadCoils: begin
+                      _err:=chASCIIReadCoils(APack, ALength, _DataBt);
+                      p:=@_DataBt;
+                    end;
+                    mbfReadDiscretInputs: begin
+                      _err:=chASCIIReadDiscretInputs(APack, ALength, _DataBt);
+                      p:=@_DataBt;
+                    end;
+                    mbfReadHoldingRegisters: begin
+                      _err:=chASCIIReadHoldingRegisters(APack, ALength, _Regs);
+                      p:=@_Regs;
+                    end;
+                    mbfReadInputRegisters: begin
+                      _err:=chASCIIReadInputRegisters(APack, ALength, _Regs);
+                      p:=@_Regs;
+                    end;
+                    mbfReadStatus: begin
+                      _err:=chASCIIReadStatus(APack, ALength, bt);
+                      p:=@bt;
+                    end;
+                    mbfWriteCoil: _err:=chASCIIWriteCoil(APack, ALength);
+                    mbfWriteCoils: _err:=chASCIIWriteCoils(APack, ALength);
+                    mbfWriteHoldingRegister: _err:=chASCIIWriteHoldingRegister(APack, ALength);
+                    mbfWriteHoldingRegisters: _err:=chASCIIWriteHoldingRegisters(APack, ALength)
+                    else begin
+                      _err:=chASCIIUserFunction(APack, ALength, _DataBt);
+                      p:=@_DataBt;
+                    end;
+                  end;
+                end;
+              end;
+            end;
+          end;
+        end;
+      end;
+      try
+        _Data^.CallBack(_err,p);
+      except on E: Exception do
+        DoRuntimeError('TKRModbusMaster.ConnectorCB [Name="'+
+          Name+'"] CallBack',E);
+      end;
+    finally
+      Dispose(APack);
+      Dispose(_Data);
+    end;
+  finally
+    CS.Leave;
+  end;
+end;
+
 constructor TKRModbusMaster.Create(AOwner: TComponent);
 begin
   inherited;
-  FQueue:=TKRThreadQueue.Create;
-  FThread:=TKRMBThread.CreateTh(Self,FQueue);
+  CS:=TCriticalSection.Create;
+  FListPosIn:=0;
+  FListPosOut:=0;
+  FListCount:=0;
+  FEvent:=CreateEvent(nil, true, false, nil);
 end;
 
 destructor TKRModbusMaster.Destroy;
 begin
-  FThread.Terminate;
-  while FThread.Working do Sleep(50);
-  FThread.Free;
-  FQueue.Free;
+  SetActive(false);
+  CS.Free;
+  CloseHandle(FEvent);
   inherited;
 end;
 
@@ -1064,34 +1418,34 @@ var
   err: integer;
 begin
   if AError>0 then begin
-    ALevel:='Ошибка прибора';
+    ALevel:=MBMEL_DEVICE_ERROR;
     if(AError<=MB_ERRORS_COUNT)then Result:=MODBUS_ERRORS_MSG[AError]
-    else Result:='Неизвестная ошибка.';
+    else Result:=MBMEL_UNKNOWN_ERROR;
   end else if(AError<0)AND(AError>-100)then begin
-    ALevel:='Ошибка обработки данных';
+    ALevel:=MBMEL_DATA_PROCESSING_ERROR;
     err:=-AError;
     if(err<=MBM_ERRORS_COUNT)then Result:=MB_PARSER_ERRORS_MSG[err]
   end else if AError<-100 then begin
-    ALevel:='Ошибка передачи данных';
+    ALevel:=MBMEL_DATA_TRANSMISSION_ERROR;
     err:=-AError-100;
     Result:=FConnector.ErrorMsg(err);
   end else if AError=0 then begin
     ALevel:='';
-    Result:='Нет ошибок.';
+    Result:=MBMEL_NO_ERRORS;
   end else begin
     ALevel:='';
-    Result:='Неизвестная ошибка.';
+    Result:=MBMEL_UNKNOWN_ERROR;
   end;
 end;
 
 function TKRModbusMaster.GetActive: boolean;
 begin
-  Result:=FThread.Active;
-end;
-
-function TKRModbusMaster.GetCheckID: boolean;
-begin
-  Result:=FThread.FCheckID;
+  CS.Enter;
+  try
+    Result:=Assigned(FThread);
+  finally
+    CS.Leave;
+  end;
 end;
 
 function TKRModbusMaster.GetRuntimeErrorEv: TKRRuntimeErrorEv;
@@ -1103,17 +1457,7 @@ end;
 
 function TKRModbusMaster.GetQueueCount: integer;
 begin
-  Result:=FQueue.Count;
-end;
-
-function TKRModbusMaster.GetWaitPauseTime: Cardinal;
-begin
-  Result:=FThread.WaitPauseTime;
-end;
-
-function TKRModbusMaster.GetWaitTime: Cardinal;
-begin
-  Result:=FThread.WaitTime;
+  Result:=FListCount;
 end;
 
 procedure TKRModbusMaster.Notification(AComponent: TComponent; Operation: TOperation);
@@ -1127,31 +1471,34 @@ procedure TKRModbusMaster.ReadDiscretInputs(AMBType: TMBType; AAddres: byte;
   AStartInput, ACount: Word; ACallBack: TMBMCallBack);
 var
   _pk: PMBPack;
+  er: integer;
 begin
-  if not Active then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeModbusNotActive,nil);
-    exit;
+  er:=0;
+  CS.Enter;
+  try
+    if not Assigned(FThread) then er:=mbmeModbusNotActive
+    else if not Assigned(FConnector) then er:=mbmeNotConnector
+    else if FListCount=MBM_QUEUE_MAX_ITEMS then er:=mbmeQueueOverflowed
+    else begin
+      New(_pk);
+      _pk.Addres:=AAddres;
+      _pk.MBType:=AMBType;
+      _pk.MBFunc:=mbfReadDiscretInputs;
+      _pk.Start:=AStartInput;
+      _pk.Count:=ACount;
+      _pk.Data:=nil;
+      _pk.CallBack:=ACallBack;
+      _pk.pBuf:=nil;
+      _pk.bLen:=0;
+      FList[FListPosIn]:=_pk;
+      if FListPosIn=MBM_QUEUE_MAX_ITEMS-1 then FListPosIn:=0 else inc(FListPosIn);
+      inc(FListCount);
+      SetEvent(FEvent);
+    end;
+  finally
+    CS.Leave;
   end;
-  if not Assigned(FConnector) then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeNotConnector,nil);
-    exit;
-  end;
-  if FQueue.AtLeast(MB_QUEUE_MAX_ITEMS)then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeQueueOverflowed,nil);
-    exit;
-  end;
-
-  New(_pk);
-  _pk.Addres:=AAddres;
-  _pk.MBType:=AMBType;
-  _pk.MBFunc:=mbfReadDiscretInputs;
-  _pk.Start:=AStartInput;
-  _pk.Count:=ACount;
-  _pk.Data:=nil;
-  _pk.CallBack:=ACallBack;
-  _pk.pBuf:=nil;
-  _pk.bLen:=0;
-  FQueue.Push(_pk);
+  if(er>0)and Assigned(ACallBack)then ACallBack(-er,nil);
 end;
 
 function TKRModbusMaster.ReadDiscretInputsPack(AMBType: TMBType; AAddres: byte;
@@ -1169,31 +1516,34 @@ procedure TKRModbusMaster.ReadHoldingRegisters(AMBType: TMBType; AAddres: byte;
   AStartReg, ACount: Word; ACallBack: TMBMCallBack);
 var
   _pk: PMBPack;
+  er: integer;
 begin
-  if not Active then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeModbusNotActive,nil);
-    exit;
+  er:=0;
+  CS.Enter;
+  try
+    if not Assigned(FThread) then er:=mbmeModbusNotActive
+    else if not Assigned(FConnector) then er:=mbmeNotConnector
+    else if FListCount=MBM_QUEUE_MAX_ITEMS then er:=mbmeQueueOverflowed
+    else begin
+      New(_pk);
+      _pk.Addres:=AAddres;
+      _pk.MBType:=AMBType;
+      _pk.MBFunc:=mbfReadHoldingRegisters;
+      _pk.Start:=AStartReg;
+      _pk.Count:=ACount;
+      _pk.Data:=nil;
+      _pk.CallBack:=ACallBack;
+      _pk.pBuf:=nil;
+      _pk.bLen:=0;
+      FList[FListPosIn]:=_pk;
+      if FListPosIn=MBM_QUEUE_MAX_ITEMS-1 then FListPosIn:=0 else inc(FListPosIn);
+      inc(FListCount);
+      SetEvent(FEvent);
+    end;
+  finally
+    CS.Leave;
   end;
-  if not Assigned(FConnector) then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeNotConnector,nil);
-    exit;
-  end;
-  if FQueue.AtLeast(MB_QUEUE_MAX_ITEMS)then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeQueueOverflowed,nil);
-    exit;
-  end;
-
-  New(_pk);
-  _pk.Addres:=AAddres;
-  _pk.MBType:=AMBType;
-  _pk.MBFunc:=mbfReadHoldingRegisters;
-  _pk.Start:=AStartReg;
-  _pk.Count:=ACount;
-  _pk.Data:=nil;
-  _pk.CallBack:=ACallBack;
-  _pk.pBuf:=nil;
-  _pk.bLen:=0;
-  FQueue.Push(_pk);
+  if(er>0)and Assigned(ACallBack)then ACallBack(-er,nil);
 end;
 
 function TKRModbusMaster.ReadHoldingRegistersPack(AMBType: TMBType;
@@ -1211,32 +1561,36 @@ procedure TKRModbusMaster.ReadInputRegisters(AMBType: TMBType; AAddres: byte;
   AStartReg, ACount: Word; ACallBack: TMBMCallBack);
 var
   _pk: PMBPack;
+  er: integer;
 begin
-  if not Active then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeModbusNotActive,nil);
-    exit;
+  er:=0;
+  CS.Enter;
+  try
+    if not Assigned(FThread) then er:=mbmeModbusNotActive
+    else if not Assigned(FConnector) then er:=mbmeNotConnector
+    else if FListCount=MBM_QUEUE_MAX_ITEMS then er:=mbmeQueueOverflowed
+    else begin
+      New(_pk);
+      _pk.Addres:=AAddres;
+      _pk.MBType:=AMBType;
+      _pk.MBFunc:=mbfReadInputRegisters;
+      _pk.Start:=AStartReg;
+      _pk.Count:=ACount;
+      _pk.Data:=nil;
+      _pk.CallBack:=ACallBack;
+      _pk.pBuf:=nil;
+      _pk.bLen:=0;
+      FList[FListPosIn]:=_pk;
+      if FListPosIn=MBM_QUEUE_MAX_ITEMS-1 then FListPosIn:=0 else inc(FListPosIn);
+      inc(FListCount);
+      SetEvent(FEvent);
+    end;
+  finally
+    CS.Leave;
   end;
-  if not Assigned(FConnector) then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeNotConnector,nil);
-    exit;
-  end;
-  if FQueue.AtLeast(MB_QUEUE_MAX_ITEMS)then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeQueueOverflowed,nil);
-    exit;
-  end;
-
-  New(_pk);
-  _pk.Addres:=AAddres;
-  _pk.MBType:=AMBType;
-  _pk.MBFunc:=mbfReadInputRegisters;
-  _pk.Start:=AStartReg;
-  _pk.Count:=ACount;
-  _pk.Data:=nil;
-  _pk.CallBack:=ACallBack;
-  _pk.pBuf:=nil;
-  _pk.bLen:=0;
-  FQueue.Push(_pk)
+  if(er>0)and Assigned(ACallBack)then ACallBack(-er,nil);
 end;
+
 
 function TKRModbusMaster.ReadInputRegistersPack(AMBType: TMBType;
   AAddres: byte; AStartReg, ACount: Word; APPack: PKRBuffer; out ARecvLen: byte): byte;
@@ -1253,31 +1607,34 @@ procedure TKRModbusMaster.ReadReadCoils(AMBType: TMBType; AAddres: byte;
   AStartCoil, ACount: Word; ACallBack: TMBMCallBack);
 var
   _pk: PMBPack;
+  er: integer;
 begin
-  if not Active then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeModbusNotActive,nil);
-    exit;
+  er:=0;
+  CS.Enter;
+  try
+    if not Assigned(FThread) then er:=mbmeModbusNotActive
+    else if not Assigned(FConnector) then er:=mbmeNotConnector
+    else if FListCount=MBM_QUEUE_MAX_ITEMS then er:=mbmeQueueOverflowed
+    else begin
+      New(_pk);
+      _pk.Addres:=AAddres;
+      _pk.MBType:=AMBType;
+      _pk.MBFunc:=mbfReadCoils;
+      _pk.Start:=AStartCoil;
+      _pk.Count:=ACount;
+      _pk.Data:=nil;
+      _pk.CallBack:=ACallBack;
+      _pk.pBuf:=nil;
+      _pk.bLen:=0;
+      FList[FListPosIn]:=_pk;
+      if FListPosIn=MBM_QUEUE_MAX_ITEMS-1 then FListPosIn:=0 else inc(FListPosIn);
+      inc(FListCount);
+      SetEvent(FEvent);
+    end;
+  finally
+    CS.Leave;
   end;
-  if not Assigned(FConnector) then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeNotConnector,nil);
-    exit;
-  end;
-  if FQueue.AtLeast(MB_QUEUE_MAX_ITEMS)then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeQueueOverflowed,nil);
-    exit;
-  end;
-
-  New(_pk);
-  _pk.Addres:=AAddres;
-  _pk.MBType:=AMBType;
-  _pk.MBFunc:=mbfReadCoils;
-  _pk.Start:=AStartCoil;
-  _pk.Count:=ACount;
-  _pk.Data:=nil;
-  _pk.CallBack:=ACallBack;
-  _pk.pBuf:=nil;
-  _pk.bLen:=0;
-  FQueue.Push(_pk)
+  if(er>0)and Assigned(ACallBack)then ACallBack(-er,nil);
 end;
 
 function TKRModbusMaster.ReadReadCoilsPack(AMBType: TMBType; AAddres: byte;
@@ -1295,30 +1652,34 @@ procedure TKRModbusMaster.ReadStatus(AMBType: TMBType; AAddres: byte;
   ACallBack: TMBMCallBack);
 var
   _pk: PMBPack;
+  er: integer;
 begin
-  if not Active then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeModbusNotActive,nil);
-    exit;
+  er:=0;
+  CS.Enter;
+  try
+    if not Assigned(FThread) then er:=mbmeModbusNotActive
+    else if not Assigned(FConnector) then er:=mbmeNotConnector
+    else if FListCount=MBM_QUEUE_MAX_ITEMS then er:=mbmeQueueOverflowed
+    else begin
+      New(_pk);
+      _pk.Addres:=AAddres;
+      _pk.MBType:=AMBType;
+      _pk.MBFunc:=mbfReadStatus;
+      _pk.Data:=nil;
+      _pk.CallBack:=ACallBack;
+      _pk.pBuf:=nil;
+      _pk.bLen:=0;
+      FList[FListPosIn]:=_pk;
+      if FListPosIn=MBM_QUEUE_MAX_ITEMS-1 then FListPosIn:=0 else inc(FListPosIn);
+      inc(FListCount);
+      SetEvent(FEvent);
+    end;
+  finally
+    CS.Leave;
   end;
-  if not Assigned(FConnector) then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeNotConnector,nil);
-    exit;
-  end;
-  if FQueue.AtLeast(MB_QUEUE_MAX_ITEMS)then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeQueueOverflowed,nil);
-    exit;
-  end;
-
-  New(_pk);
-  _pk.Addres:=AAddres;
-  _pk.MBType:=AMBType;
-  _pk.MBFunc:=mbfReadStatus;
-  _pk.Data:=nil;
-  _pk.CallBack:=ACallBack;
-  _pk.pBuf:=nil;
-  _pk.bLen:=0;
-  FQueue.Push(_pk)
+  if(er>0)and Assigned(ACallBack)then ACallBack(-er,nil);
 end;
+
 
 function TKRModbusMaster.ReadStatusPack(AMBType: TMBType; AAddres: byte;
   APPack: PKRBuffer; out ARecvLen: byte): byte;
@@ -1335,39 +1696,73 @@ procedure TKRModbusMaster.SendPack(AMBType: TMBType; AFunc: TMBFunc; APPack: PKR
   ACallBack: TMBMCallBack; ARecvLen: byte);
 var
   _pk: PMBPack;
+  er: integer;
 begin
-  if not Active then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeModbusNotActive,nil);
-    exit;
+  er:=0;
+  CS.Enter;
+  try
+    if not Assigned(FThread) then er:=mbmeModbusNotActive
+    else if not Assigned(FConnector) then er:=mbmeNotConnector
+    else if FListCount=MBM_QUEUE_MAX_ITEMS then er:=mbmeQueueOverflowed
+    else begin
+      New(_pk);
+      _pk.MBType:=AMBType;
+      _pk.MBFunc:=AFunc;
+      _pk.Data:=nil;
+      _pk.CallBack:=ACallBack;
+      _pk.pBuf:=APPack;
+      _pk.bLen:=APkLen;
+      _pk.bRLen:=ARecvLen;
+      FList[FListPosIn]:=_pk;
+      if FListPosIn=MBM_QUEUE_MAX_ITEMS-1 then FListPosIn:=0 else inc(FListPosIn);
+      inc(FListCount);
+      SetEvent(FEvent);
+    end;
+  finally
+    CS.Leave;
   end;
-  if not Assigned(FConnector) then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeNotConnector,nil);
-    exit;
-  end;
-  if FQueue.AtLeast(MB_QUEUE_MAX_ITEMS)then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeQueueOverflowed,nil);
-    exit;
-  end;
-
-  New(_pk);
-  _pk.MBType:=AMBType;
-  _pk.MBFunc:=AFunc;
-  _pk.Data:=nil;
-  _pk.CallBack:=ACallBack;
-  _pk.pBuf:=APPack;
-  _pk.bLen:=APkLen;
-  _pk.bRLen:=ARecvLen;
-  FQueue.Push(_pk);
+  if(er>0)and Assigned(ACallBack)then ACallBack(-er,nil);
 end;
 
 procedure TKRModbusMaster.SetActive(const Value: boolean);
+var
+  pk: PMBPack;
+  cb: array of TMBMCallBack;
+  n,i: integer;
 begin
-  FThread.Active:=Value;
-end;
-
-procedure TKRModbusMaster.SetCheckID(const Value: boolean);
-begin
-  FThread.FCheckID:=Value;
+  n:=0;
+  CS.Enter;
+  try
+    if Value then begin
+      if Assigned(FThread) then exit;
+      ResetEvent(FEvent);
+      FThread:=TKRMBThread.CreateTh(Self);
+    end else begin
+      if not Assigned(FThread) then exit;
+      FThread.Terminate;
+      FreeAndNil(FThread);
+      SetLength(cb,FListCount);
+      while FListCount>0 do begin
+        pk:=FList[FListPosOut];
+        if FListPosOut=MBM_QUEUE_MAX_ITEMS-1 then FListPosOut:=0 else inc(FListPosOut);
+        dec(FListCount);
+        if Assigned(pk^.CallBack) then begin
+          cb[n]:=pk^.CallBack;
+          inc(n);
+        end;
+        dispose(pk);
+      end;
+    end;
+  finally
+    CS.Leave;
+  end;
+  dec(n);
+  for i:=0 to n do
+    try
+      cb[i](-mbmeModbusNotActive,nil);
+    except on E: Exception do
+      DoRuntimeError('TKRModbusMaster.SetActive[Name="'+Name+'"]',E);
+    end;
 end;
 
 procedure TKRModbusMaster.SetConnector(const Value: TKRConnector);
@@ -1390,44 +1785,37 @@ begin
   RECS_Leave;
 end;
 
-procedure TKRModbusMaster.SetWaitPauseTime(const Value: Cardinal);
-begin
-  Fthread.WaitPauseTime:=Value;
-end;
-
-procedure TKRModbusMaster.SetWaitTime(const Value: Cardinal);
-begin
-  Fthread.WaitTime:=Value;
-end;
-
 procedure TKRModbusMaster.UserFunction(AMBType: TMBType; AAddres, AFunc: byte;
   AData: PKRBuffer; ADataLen: integer; ACallBack: TMBMCallBack);
 var
   _pk: PMBPack;
+  er: integer;
 begin
-  if not Active then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeModbusNotActive,nil);
-    exit;
+  er:=0;
+  CS.Enter;
+  try
+    if not Assigned(FThread) then er:=mbmeModbusNotActive
+    else if not Assigned(FConnector) then er:=mbmeNotConnector
+    else if FListCount=MBM_QUEUE_MAX_ITEMS then er:=mbmeQueueOverflowed
+    else begin
+      New(_pk);
+      _pk.Addres:=AAddres;
+      _pk.MBType:=AMBType;
+      _pk.MBFunc:=AFunc;
+      _pk.Count:=ADataLen;
+      _pk.uData:=AData;
+      _pk.CallBack:=ACallBack;
+      _pk.pBuf:=nil;
+      _pk.bLen:=0;
+      FList[FListPosIn]:=_pk;
+      if FListPosIn=MBM_QUEUE_MAX_ITEMS-1 then FListPosIn:=0 else inc(FListPosIn);
+      inc(FListCount);
+      SetEvent(FEvent);
+    end;
+  finally
+    CS.Leave;
   end;
-  if not Assigned(FConnector) then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeNotConnector,nil);
-    exit;
-  end;
-  if FQueue.AtLeast(MB_QUEUE_MAX_ITEMS)then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeQueueOverflowed,nil);
-    exit;
-  end;
-
-  New(_pk);
-  _pk.Addres:=AAddres;
-  _pk.MBType:=AMBType;
-  _pk.MBFunc:=AFunc;
-  _pk.Count:=ADataLen;
-  _pk.uData:=AData;
-  _pk.CallBack:=ACallBack;
-  _pk.pBuf:=nil;
-  _pk.bLen:=0;
-  FQueue.Push(_pk);
+  if(er>0)and Assigned(ACallBack)then ACallBack(-er,nil);
 end;
 
 function TKRModbusMaster.UserFunctionPack(AMBType: TMBType; AAddres,
@@ -1445,32 +1833,36 @@ procedure TKRModbusMaster.WriteCoil(AMBType: TMBType; AAddres: byte;
   ACoilNum: Word; AData: boolean; ACallBack: TMBMCallBack);
 var
   _pk: PMBPack;
+  er: integer;
 begin
-  if not Active then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeModbusNotActive,nil);
-    exit;
+  er:=0;
+  CS.Enter;
+  try
+    if not Assigned(FThread) then er:=mbmeModbusNotActive
+    else if not Assigned(FConnector) then er:=mbmeNotConnector
+    else if FListCount=MBM_QUEUE_MAX_ITEMS then er:=mbmeQueueOverflowed
+    else begin
+      New(_pk);
+      _pk.Addres:=AAddres;
+      _pk.MBType:=AMBType;
+      _pk.MBFunc:=mbfWriteCoil;
+      _pk.Start:=ACoilNum;
+      SetLength(_pk.DataBt,1);
+      _pk.DataBt[0]:=SetBitTo(0,0,AData);
+      _pk.CallBack:=ACallBack;
+      _pk.pBuf:=nil;
+      _pk.bLen:=0;
+      FList[FListPosIn]:=_pk;
+      if FListPosIn=MBM_QUEUE_MAX_ITEMS-1 then FListPosIn:=0 else inc(FListPosIn);
+      inc(FListCount);
+      SetEvent(FEvent);
+    end;
+  finally
+    CS.Leave;
   end;
-  if not Assigned(FConnector) then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeNotConnector,nil);
-    exit;
-  end;
-  if FQueue.AtLeast(MB_QUEUE_MAX_ITEMS)then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeQueueOverflowed,nil);
-    exit;
-  end;
-
-  New(_pk);
-  _pk.Addres:=AAddres;
-  _pk.MBType:=AMBType;
-  _pk.MBFunc:=mbfWriteCoil;
-  _pk.Start:=ACoilNum;
-  SetLength(_pk.DataBt,1);
-  _pk.DataBt[0]:=SetBitTo(0,0,AData);
-  _pk.CallBack:=ACallBack;
-  _pk.pBuf:=nil;
-  _pk.bLen:=0;
-  FQueue.Push(_pk);
+  if(er>0)and Assigned(ACallBack)then ACallBack(-er,nil);
 end;
+
 
 function TKRModbusMaster.WriteCoilPack(AMBType: TMBType; AAddres: byte;
   ACoilNum: Word; AData: boolean; APPack: PKRBuffer; out ARecvLen: byte): byte;
@@ -1487,32 +1879,36 @@ procedure TKRModbusMaster.WriteCoils(AMBType: TMBType; AAddres: byte;
   AStartCoil, ACount: Word; AData: TKRBytes; ACallBack: TMBMCallBack);
 var
   _pk: PMBPack;
+  er: integer;
 begin
-  if not Active then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeModbusNotActive,nil);
-    exit;
+  er:=0;
+  CS.Enter;
+  try
+    if not Assigned(FThread) then er:=mbmeModbusNotActive
+    else if not Assigned(FConnector) then er:=mbmeNotConnector
+    else if FListCount=MBM_QUEUE_MAX_ITEMS then er:=mbmeQueueOverflowed
+    else begin
+      New(_pk);
+      _pk.Addres:=AAddres;
+      _pk.MBType:=AMBType;
+      _pk.MBFunc:=mbfWriteCoils;
+      _pk.Start:=AStartCoil;
+      _pk.Count:=ACount;
+      _pk.DataBt:=AData;
+      _pk.CallBack:=ACallBack;
+      _pk.pBuf:=nil;
+      _pk.bLen:=0;
+      FList[FListPosIn]:=_pk;
+      if FListPosIn=MBM_QUEUE_MAX_ITEMS-1 then FListPosIn:=0 else inc(FListPosIn);
+      inc(FListCount);
+      SetEvent(FEvent);
+    end;
+  finally
+    CS.Leave;
   end;
-  if not Assigned(FConnector) then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeNotConnector,nil);
-    exit;
-  end;
-  if FQueue.AtLeast(MB_QUEUE_MAX_ITEMS)then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeQueueOverflowed,nil);
-    exit;
-  end;
-
-  New(_pk);
-  _pk.Addres:=AAddres;
-  _pk.MBType:=AMBType;
-  _pk.MBFunc:=mbfWriteCoils;
-  _pk.Start:=AStartCoil;
-  _pk.Count:=ACount;
-  _pk.DataBt:=AData;
-  _pk.CallBack:=ACallBack;
-  _pk.pBuf:=nil;
-  _pk.bLen:=0;
-  FQueue.Push(_pk);
+  if(er>0)and Assigned(ACallBack)then ACallBack(-er,nil);
 end;
+
 
 function TKRModbusMaster.WriteCoilsPack(AMBType: TMBType; AAddres: byte;
   AStartCoil, ACount: Word; AData: TKRBytes; APPack: PKRBuffer;
@@ -1530,33 +1926,37 @@ procedure TKRModbusMaster.WriteHoldingRegister(AMBType: TMBType; AAddres: byte;
   AStartReg, AData: Word; ACallBack: TMBMCallBack);
 var
   _pk: PMBPack;
+  er: integer;
 begin
-  if not Active then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeModbusNotActive,nil);
-    exit;
+  er:=0;
+  CS.Enter;
+  try
+    if not Assigned(FThread) then er:=mbmeModbusNotActive
+    else if not Assigned(FConnector) then er:=mbmeNotConnector
+    else if FListCount=MBM_QUEUE_MAX_ITEMS then er:=mbmeQueueOverflowed
+    else begin
+      New(_pk);
+      _pk.Addres:=AAddres;
+      _pk.MBType:=AMBType;
+      _pk.MBFunc:=mbfWriteHoldingRegister;
+      _pk.Start:=AStartReg;
+      _pk.Count:=1;
+      SetLength(_pk.Data,1);
+      _pk.Data[0]:=AData;
+      _pk.CallBack:=ACallBack;
+      _pk.pBuf:=nil;
+      _pk.bLen:=0;
+      FList[FListPosIn]:=_pk;
+      if FListPosIn=MBM_QUEUE_MAX_ITEMS-1 then FListPosIn:=0 else inc(FListPosIn);
+      inc(FListCount);
+      SetEvent(FEvent);
+    end;
+  finally
+    CS.Leave;
   end;
-  if not Assigned(FConnector) then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeNotConnector,nil);
-    exit;
-  end;
-  if FQueue.AtLeast(MB_QUEUE_MAX_ITEMS)then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeQueueOverflowed,nil);
-    exit;
-  end;
-
-  New(_pk);
-  _pk.Addres:=AAddres;
-  _pk.MBType:=AMBType;
-  _pk.MBFunc:=mbfWriteHoldingRegister;
-  _pk.Start:=AStartReg;
-  _pk.Count:=1;
-  SetLength(_pk.Data,1);
-  _pk.Data[0]:=AData;
-  _pk.CallBack:=ACallBack;
-  _pk.pBuf:=nil;
-  _pk.bLen:=0;
-  FQueue.Push(_pk);
+  if(er>0)and Assigned(ACallBack)then ACallBack(-er,nil);
 end;
+
 
 function TKRModbusMaster.WriteHoldingRegisterPack(AMBType: TMBType;
   AAddres: byte; AStartReg, AData: Word; APPack: PKRBuffer; out ARecvLen: byte): byte;
@@ -1573,32 +1973,36 @@ procedure TKRModbusMaster.WriteHoldingRegisters(AMBType: TMBType; AAddres: byte;
   AStartReg: Word; AData: TKRRegisters; ACallBack: TMBMCallBack);
 var
   _pk: PMBPack;
+  er: integer;
 begin
-  if not Active then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeModbusNotActive,nil);
-    exit;
+  er:=0;
+  CS.Enter;
+  try
+    if not Assigned(FThread) then er:=mbmeModbusNotActive
+    else if not Assigned(FConnector) then er:=mbmeNotConnector
+    else if FListCount=MBM_QUEUE_MAX_ITEMS then er:=mbmeQueueOverflowed
+    else begin
+      New(_pk);
+      _pk.Addres:=AAddres;
+      _pk.MBType:=AMBType;
+      _pk.MBFunc:=mbfWriteHoldingRegisters;
+      _pk.Start:=AStartReg;
+      _pk.Count:=Length(AData);
+      _pk.Data:=AData;
+      _pk.CallBack:=ACallBack;
+      _pk.pBuf:=nil;
+      _pk.bLen:=0;
+      FList[FListPosIn]:=_pk;
+      if FListPosIn=MBM_QUEUE_MAX_ITEMS-1 then FListPosIn:=0 else inc(FListPosIn);
+      inc(FListCount);
+      SetEvent(FEvent);
+    end;
+  finally
+    CS.Leave;
   end;
-  if not Assigned(FConnector) then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeNotConnector,nil);
-    exit;
-  end;
-  if FQueue.AtLeast(MB_QUEUE_MAX_ITEMS)then begin
-    if Assigned(ACallBack)then ACallBack(-mbmeQueueOverflowed,nil);
-    exit;
-  end;
-
-  New(_pk);
-  _pk.Addres:=AAddres;
-  _pk.MBType:=AMBType;
-  _pk.MBFunc:=mbfWriteHoldingRegisters;
-  _pk.Start:=AStartReg;
-  _pk.Count:=Length(AData);
-  _pk.Data:=AData;
-  _pk.CallBack:=ACallBack;
-  _pk.pBuf:=nil;
-  _pk.bLen:=0;
-  FQueue.Push(_pk);
+  if(er>0)and Assigned(ACallBack)then ACallBack(-er,nil);
 end;
+
 
 function TKRModbusMaster.WriteHoldingRegistersPack(AMBType: TMBType;
   AAddres: byte; AStartReg: Word; AData: TKRRegisters; APPack: PKRBuffer; out ARecvLen: byte): byte;
@@ -1612,300 +2016,11 @@ end;
 
 { TKRMBThread }
 
-function TKRMBThread.chASCIIReadCoils(APack: PKRBuffer; ALength: byte;
-  var ABytes: TKRBytes): integer;
-var
-  n,i: integer;
+constructor TKRMBThread.CreateTh(AModbus: TKRModbusMaster);
 begin
-  Result:=0;
-  n:=MBHexToValue(APack^[5],APack^[6]);
-  SetLength(ABytes,n);
-  for i := 0 to n-1 do ABytes[i]:=MBHexToValue(APack^[i*2+6],APack^[i*2+7]);
-end;
-
-function TKRMBThread.chASCIIReadDiscretInputs(APack: PKRBuffer; ALength: byte;
-  var ABytes: TKRBytes): integer;
-var
-  n,i: integer;
-begin
-  Result:=0;
-  n:=MBHexToValue(APack^[5],APack^[6]);
-  SetLength(ABytes,n);
-  for i := 0 to n-1 do ABytes[i]:=MBHexToValue(APack^[i*2+6],APack^[i*2+7]);
-end;
-
-function TKRMBThread.chASCIIReadHoldingRegisters(APack: PKRBuffer;
-  ALength: byte; var ARegs: TKRRegisters): integer;
-var
-  n, i: integer;
-begin
-  Result:=0;
-  n:=MBHexToValue(APack^[5],APack^[6]) div 2;
-  if n<1 then begin
-    SetLength(ARegs,1);
-    ARegs[0]:=0;
-  end else begin
-    SetLength(ARegs,n);
-    for i := 0 to n-1 do
-      ARegs[i]:=BytesToWord(
-        MBHexToValue(APack^[i*4+9],APack^[i*4+10]),
-        MBHexToValue(APack^[i*4+7],APack^[i*4+8])
-      );
-  end;
-end;
-
-function TKRMBThread.chASCIIReadInputRegisters(APack: PKRBuffer; ALength: byte;
-  var ARegs: TKRRegisters): integer;
-var
-  n, i: integer;
-begin
-  Result:=0;
-  n:=MBHexToValue(APack^[5],APack^[6]) div 2;
-  if n<1 then begin
-    SetLength(ARegs,1);
-    ARegs[0]:=0;
-  end else begin
-    SetLength(ARegs,n);
-    for i := 0 to n-1 do
-      ARegs[i]:=BytesToWord(
-        MBHexToValue(APack^[i*4+9],APack^[i*4+10]),
-        MBHexToValue(APack^[i*4+7],APack^[i*4+8])
-      );
-  end;
-end;
-
-function TKRMBThread.chASCIIReadStatus(APack: PKRBuffer; ALength: byte;
-  var AStatus: Byte): integer;
-begin
-  Result:=0;
-  AStatus:=MBHexToValue(APack^[5],APack^[6]);
-end;
-
-function TKRMBThread.chASCIIUserFunction(APack: PKRBuffer; ALength: byte;
-  var AData: TKRBytes): integer;
-var
-  i, n: integer;
-begin
-  Result:=0;
-  n:=ALength-2;
-  if n<0 then n:=0;
-  SetLength(AData,n);
-  for i := 0 to n-1 do AData[i]:=MBHexToValue(APack^[i*2+5],APack^[i*2+6]);
-end;
-
-function TKRMBThread.chASCIIWriteCoil(APack: PKRBuffer; ALength: byte): integer;
-begin
-  Result:=0;
-end;
-
-function TKRMBThread.chASCIIWriteCoils(APack: PKRBuffer; ALength: byte): integer;
-begin
-  Result:=0;
-end;
-
-function TKRMBThread.chASCIIWriteHoldingRegister(APack: PKRBuffer;
-  ALength: byte): integer;
-begin
-  Result:=0;
-end;
-
-function TKRMBThread.chASCIIWriteHoldingRegisters(APack: PKRBuffer;
-  ALength: byte): integer;
-begin
-  Result:=0;
-end;
-
-function TKRMBThread.chRTUReadCoils(APack: PKRBuffer; ALength: byte;
-  var ABytes: TKRBytes): integer;
-var
-  i: integer;
-begin
-  Result:=0;
-  SetLength(ABytes,APack^[2]);
-  for i := 0 to APack^[2]-1 do ABytes[i]:=APack^[3+i];
-end;
-
-function TKRMBThread.chRTUReadDiscretInputs(APack: PKRBuffer; ALength: byte;
-  var ABytes: TKRBytes): integer;
-var
-  i: integer;
-begin
-  Result:=0;
-  SetLength(ABytes,APack^[2]);
-  for i := 0 to APack^[2]-1 do ABytes[i]:=APack^[3+i];
-end;
-
-function TKRMBThread.chRTUReadHoldingRegisters(APack: PKRBuffer; ALength: byte;
-  var ARegs: TKRRegisters): integer;
-var
-  n, i: integer;
-begin
-  Result:=0;
-  n:=APack^[2] div 2;
-  if n<1 then begin
-    SetLength(ARegs,1);
-    ARegs[0]:=0;
-  end else begin
-    SetLength(ARegs,n);
-    for i := 0 to n-1 do ARegs[i]:=BytesToWord(APack^[4+i*2],APack^[3+i*2]);
-  end;
-end;
-
-function TKRMBThread.chRTUReadInputRegisters(APack: PKRBuffer; ALength: byte;
-  var ARegs: TKRRegisters): integer;
-var
-  n, i: integer;
-begin
-  Result:=0;
-  n:=APack^[2] div 2;
-  if n<1 then begin
-    SetLength(ARegs,1);
-    ARegs[0]:=0;
-  end else begin
-    SetLength(ARegs,n);
-    for i := 0 to n-1 do ARegs[i]:=BytesToWord(APack^[4+i*2],APack^[3+i*2]);
-  end;
-end;
-
-function TKRMBThread.chRTUReadStatus(APack: PKRBuffer; ALength: byte;
-  var AStatus: Byte): integer;
-begin
-  Result:=0;
-  AStatus:=APack^[2];
-end;
-
-function TKRMBThread.chRTUUserFunction(APack: PKRBuffer; ALength: byte;
-  var AData: TKRBytes): integer;
-var
-  i, n: integer;
-begin
-  Result:=0;
-  n:=ALength-2;
-  if n<0 then n:=0;
-  SetLength(AData,n);
-  for i := 0 to n-1 do AData[i]:=APack^[i+2];
-end;
-
-function TKRMBThread.chRTUWriteCoil(APack: PKRBuffer; ALength: byte): integer;
-begin
-  Result:=0;
-end;
-
-function TKRMBThread.chRTUWriteCoils(APack: PKRBuffer; ALength: byte): integer;
-begin
-  Result:=0;
-end;
-
-function TKRMBThread.chRTUWriteHoldingRegister(APack: PKRBuffer; ALength: byte): integer;
-begin
-  Result:=0;
-end;
-
-function TKRMBThread.chRTUWriteHoldingRegisters(APack: PKRBuffer; ALength: byte): integer;
-begin
-  Result:=0;
-end;
-
-function TKRMBThread.chTCPReadCoils(APack: PKRBuffer; ALength: byte;
-  var ABytes: TKRBytes): integer;
-var
-  i: integer;
-begin
-  Result:=0;
-  SetLength(ABytes,APack^[8]);
-  for i := 0 to APack^[8]-1 do ABytes[i]:=APack^[9+i];
-end;
-
-function TKRMBThread.chTCPReadDiscretInputs(APack: PKRBuffer; ALength: byte;
-  var ABytes: TKRBytes): integer;
-var
-  i: integer;
-begin
-  Result:=0;
-  SetLength(ABytes,APack^[8]);
-  for i := 0 to APack^[8]-1 do ABytes[i]:=APack^[9+i];
-end;
-
-function TKRMBThread.chTCPReadHoldingRegisters(APack: PKRBuffer;
-  ALength: byte; var ARegs: TKRRegisters): integer;
-var
-  n, i: integer;
-begin
-  Result:=0;
-  n:=APack^[8] div 2;
-  if n<1 then begin
-    SetLength(ARegs,1);
-    ARegs[0]:=0;
-  end else begin
-    SetLength(ARegs,n);
-    for i := 0 to n-1 do ARegs[i]:=BytesToWord(APack^[10+i*2],APack^[9+i*2]);
-  end;
-end;
-
-function TKRMBThread.chTCPReadInputRegisters(APack: PKRBuffer;
-  ALength: byte; var ARegs: TKRRegisters): integer;
-var
-  n, i: integer;
-begin
-  Result:=0;
-  n:=APack^[8] div 2;
-  if n<1 then begin
-    SetLength(ARegs,1);
-    ARegs[0]:=0;
-  end else begin
-    SetLength(ARegs,n);
-    for i := 0 to n-1 do ARegs[i]:=BytesToWord(APack^[10+i*2],APack^[9+i*2]);
-  end;
-end;
-
-function TKRMBThread.chTCPReadStatus(APack: PKRBuffer; ALength: byte;
-  var AStatus: Byte): integer;
-begin
-  Result:=0;
-  AStatus:=APack^[8];
-end;
-
-function TKRMBThread.chTCPUserFunction(APack: PKRBuffer; ALength: byte;
-  var AData: TKRBytes): integer;
-var
-  i, n: integer;
-begin
-  Result:=0;
-  n:=ALength-8;
-  if n<0 then n:=0;
-  SetLength(AData,n);
-  for i := 0 to n-1 do AData[i]:=APack^[i+8];
-end;
-
-function TKRMBThread.chTCPWriteCoil(APack: PKRBuffer; ALength: byte): integer;
-begin
-  Result:=0;
-end;
-
-function TKRMBThread.chTCPWriteCoils(APack: PKRBuffer; ALength: byte): integer;
-begin
-  Result:=0;
-end;
-
-function TKRMBThread.chTCPWriteHoldingRegister(APack: PKRBuffer;
-  ALength: byte): integer;
-begin
-  Result:=0;
-end;
-
-function TKRMBThread.chTCPWriteHoldingRegisters(APack: PKRBuffer;
-  ALength: byte): integer;
-begin
-  Result:=0;
-end;
-
-constructor TKRMBThread.CreateTh(AModbus: TKRModbusMaster; AQueue: TKRThreadQueue);
-begin
-  FQueue:=AQueue;
   FModbus:=AModbus;
-  F_ID:=0;
-  FCheckID:=true;
-  inherited Create;
+  F_ID:=1;
+  inherited Create(AModbus.FEvent);
 end;
 
 destructor TKRMBThread.Destroy;
@@ -1920,7 +2035,8 @@ begin
   try
     if APack.bLen>0 then begin
       New(_buf);
-      _buf^:=APack.pBuf^;
+      Move(APack.pBuf^,_buf^,APack.bLen);
+      //_buf^:=APack.pBuf^;
       DoSendASCII(APack,_buf,APack.bLen,APack.bRLen);
     end else case APack.MBFunc of
       mbfReadCoils: doASCIIReadCoils(APack);
@@ -2047,7 +2163,8 @@ begin
   try
     if APack.bLen>0 then begin
       New(_buf);
-      _buf^:=APack.pBuf^;
+      Move(APack.pBuf^,_buf^,APack.bLen);
+      //_buf^:=APack.pBuf^;
       DoSendRTU(APack,_buf,APack.bLen,APack.bRLen);
     end else case APack.MBFunc of
       mbfReadCoils: doRTUReadCoils(APack);
@@ -2170,24 +2287,24 @@ end;
 procedure TKRMBThread.DoSendASCII(APack: PMBPack; APBuf: PKRBuffer; ABufLen,
   ARecvLen: byte);
 begin
-  FModbus.FConnector.Send(APBuf,ABufLen,_CallBack,APack,true,ARecvLen,$0D0A,2);
+  FModbus.FConnector.Send(APBuf,ABufLen,FModbus.ConnectorCB,APack,true,ARecvLen);
 end;
 
 procedure TKRMBThread.DoSendRTU(APack: PMBPack; APBuf: PKRBuffer;
   ABufLen: byte; ARecvLen: byte);
 begin
-  FModbus.FConnector.Send(APBuf,ABufLen,_CallBack,APack,true,ARecvLen);
+  FModbus.FConnector.Send(APBuf,ABufLen,FModbus.ConnectorCB,APack,true,ARecvLen);
 end;
 
 procedure TKRMBThread.DoSendTCP(APack: PMBPack; APBuf: PKRBuffer;
   ABufLen: byte; ARecvLen: byte);
 begin
-  if FCheckID then begin
+  if FModbus.FCheckID then begin
     APack^.id:=F_ID;
     APBuf^[0]:=F_ID;
-    Inc(F_ID);
-  end;
-  FModbus.FConnector.Send(APBuf,ABufLen,_CallBack,APack,true,ARecvLen);
+    if F_ID=255 then F_ID:=1 else Inc(F_ID);
+  end else APack^.id:=0;
+  FModbus.FConnector.Send(APBuf,ABufLen,FModbus.ConnectorCB,APack,true,ARecvLen);
 end;
 
 procedure TKRMBThread.DoTCP(APack: PMBPack);
@@ -2197,7 +2314,8 @@ begin
   try
     if APack.bLen>0 then begin
       New(_buf);
-      _buf^:=APack.pBuf^;
+      Move(APack.pBuf^,_buf^,APack.bLen);
+      //_buf^:=APack.pBuf^;
       DoSendTCP(APack,_buf,APack.bLen,APack.bRLen);
     end else case APack.MBFunc of
       mbfReadCoils: doTCPReadCoils(APack);
@@ -2318,169 +2436,19 @@ begin
 end;
 
 procedure TKRMBThread.KRExecute;
-begin
-  if FQueue.Count>0 then _exec(FQueue.Pop);
-end;
-
-procedure TKRMBThread._CallBack(AError: integer; APack: PKRBuffer;
-  ALength: integer; AData: Pointer);
 var
-  _Data: PMBPack;
-  _Regs: TKRRegisters;
-  _err: integer;
-  _DataBt: TKRBytes;
-  bt: byte;
-  p: pointer;
-
-
-{  s: String;
-  i: integer;}
+  pk: PMBPack;
 begin
-
-
-  _Data:=AData;
-  p:=nil;
-  try
-    _err:=0;
-    if AError<>0 then _err:=AError*-1-100 else begin
-      if _Data^.MBType=mbtTCP then begin
-        if FCheckID and(_Data^.id<>APack^[0]) then _err:=-mbmeIncorrectID else begin
-          if APack^[7] AND $7F <> _Data^.MBFunc then _err:=-mbmeIncorrectFunction else begin
-            if GetBit(APack^[7],7) then _err:=APack^[8] else begin
-              case _Data^.MBFunc of
-                mbfReadCoils: begin
-                  _err:=chTCPReadCoils(APack, ALength, _DataBt);
-                  p:=@_DataBt;
-                end;
-                mbfReadDiscretInputs: begin
-                  _err:=chTCPReadDiscretInputs(APack, ALength, _DataBt);
-                  p:=@_DataBt;
-                end;
-                mbfReadHoldingRegisters: begin
-                  _err:=chTCPReadHoldingRegisters(APack, ALength, _Regs);
-                  p:=@_Regs;
-                end;
-                mbfReadInputRegisters: begin
-                  _err:=chTCPReadInputRegisters(APack, ALength, _Regs);
-                  p:=@_Regs;
-                end;
-                mbfReadStatus: begin
-                  _err:=chTCPReadStatus(APack, ALength, bt);
-                  p:=@bt;
-                end;
-                mbfWriteCoil: _err:=chTCPWriteCoil(APack, ALength);
-                mbfWriteCoils: _err:=chTCPWriteCoils(APack, ALength);
-                mbfWriteHoldingRegister: _err:=chTCPWriteHoldingRegister(APack, ALength);
-                mbfWriteHoldingRegisters: _err:=chTCPWriteHoldingRegisters(APack, ALength)
-                else begin
-                  _err:=chTCPUserFunction(APack, ALength, _DataBt);
-                  p:=@_DataBt;
-                end;
-              end;
-            end;
-          end;
-        end;
-      end else if _Data^.MBType=mbtRTU then begin
-        if KRCRC16(APack,ALength-2)<>BytesToWord(APack^[ALength-1],APack^[ALength-2]) then _err:=-mbmeCRC else begin
-          if APack^[1] AND $7F <> _Data^.MBFunc then _err:=-mbmeIncorrectFunction else begin
-            if GetBit(APack^[1],7) then _err:=APack^[2]
-            else begin
-              case _Data^.MBFunc of
-                mbfReadCoils: begin
-                  _err:=chRTUReadCoils(APack, ALength, _DataBt);
-                  p:=@_DataBt;
-                end;
-                mbfReadDiscretInputs: begin
-                  _err:=chRTUReadDiscretInputs(APack, ALength, _DataBt);
-                  p:=@_DataBt;
-                end;
-                mbfReadHoldingRegisters: begin
-                  _err:=chRTUReadHoldingRegisters(APack, ALength, _Regs);
-                  p:=@_Regs;
-                end;
-                mbfReadInputRegisters: begin
-                  _err:=chRTUReadInputRegisters(APack, ALength, _Regs);
-                  p:=@_Regs;
-                end;
-                mbfReadStatus: begin
-                  _err:=chRTUReadStatus(APack, ALength, bt);
-                  p:=@bt;
-                end;
-                mbfWriteCoil: _err:=chRTUWriteCoil(APack, ALength);
-                mbfWriteCoils: _err:=chRTUWriteCoils(APack, ALength);
-                mbfWriteHoldingRegister: _err:=chRTUWriteHoldingRegister(APack, ALength);
-                mbfWriteHoldingRegisters: _err:=chRTUWriteHoldingRegisters(APack, ALength)
-                else begin
-                  _err:=chRTUUserFunction(APack, ALength, _DataBt);
-                  p:=@_DataBt;
-                end;
-              end;
-            end;
-          end;
-        end;
-      end else if _Data^.MBType=mbtASCII then begin
-
-{s:='';
-for i := 0 to ALength do s:=s+Chr(APack^[i]);
-REAddLog('RECV: '+s);
-REAddLog('CRC: '+Chr(APack^[ALength-4])+Chr(APack^[ALength-3]));
-REAddLog('CRC: '+IntToStr(MBHexToValue(APack^[ALength-4],APack^[ALength-3])));
-REAddLog('LRC: '+IntToStr(MBLRC(APack,ALength)));}
-
-        if MBLRC(APack,ALength)<>MBHexToValue(APack^[ALength-4],APack^[ALength-3])then _err:=-mbmeCRC else begin
-          bt:=MBHexToValue(APack^[3],APack^[4]);
-          if bt AND $7F <> _Data^.MBFunc then _err:=-mbmeIncorrectFunction else begin
-            if GetBit(bt,7) then _err:=MBHexToValue(APack^[5],APack^[6])
-            else begin
-              case _Data^.MBFunc of
-                mbfReadCoils: begin
-                  _err:=chASCIIReadCoils(APack, ALength, _DataBt);
-                  p:=@_DataBt;
-                end;
-                mbfReadDiscretInputs: begin
-                  _err:=chASCIIReadDiscretInputs(APack, ALength, _DataBt);
-                  p:=@_DataBt;
-                end;
-                mbfReadHoldingRegisters: begin
-                  _err:=chASCIIReadHoldingRegisters(APack, ALength, _Regs);
-                  p:=@_Regs;
-                end;
-                mbfReadInputRegisters: begin
-                  _err:=chASCIIReadInputRegisters(APack, ALength, _Regs);
-                  p:=@_Regs;
-                end;
-                mbfReadStatus: begin
-                  _err:=chASCIIReadStatus(APack, ALength, bt);
-                  p:=@bt;
-                end;
-                mbfWriteCoil: _err:=chASCIIWriteCoil(APack, ALength);
-                mbfWriteCoils: _err:=chASCIIWriteCoils(APack, ALength);
-                mbfWriteHoldingRegister: _err:=chASCIIWriteHoldingRegister(APack, ALength);
-                mbfWriteHoldingRegisters: _err:=chASCIIWriteHoldingRegisters(APack, ALength)
-                else begin
-                  _err:=chASCIIUserFunction(APack, ALength, _DataBt);
-                  p:=@_DataBt;
-                end;
-              end;
-            end;
-          end;
-        end;
-      end;
-    end;
-    if Assigned(_Data^.CallBack) then _Data^.CallBack(_err,p);
-  except on E: Exception do
-    FModbus.DoRuntimeError('TKRMBThread[FModbus.Name="'+
-      FModbus.Name+'"] procedure _CallBack; ',E);
-  end;
-
-  try
-
-  Dispose(APack);
-  Dispose(_Data);
-  except on E: Exception do
-    FModbus.DoRuntimeError('TKRMBThread[FModbus.Name="'+
-      FModbus.Name+'"] procedure _CallBack; ',E);
-  end;
+  FModbus.CS.Enter;
+  pk:=FModbus.FList[FModbus.FListPosOut];
+  if FModbus.FListPosOut=MBM_QUEUE_MAX_ITEMS-1 then FModbus.FListPosOut:=0 else inc(FModbus.FListPosOut);
+  dec(FModbus.FListCount);
+  FModbus.CS.Leave;
+  _exec(pk);
+  if Terminated then exit;  
+  FModbus.CS.Enter;
+  if FModbus.FListCount=0 then ResetEvent(FModbus.FEvent);
+  FModbus.CS.Leave;
 end;
 
 procedure TKRMBThread._exec(APack: PMBPack);

@@ -18,6 +18,9 @@
 			<Projects Include="packages\d160\KRWeb.dproj">
 				<Dependencies/>
 			</Projects>
+			<Projects Include="T:\1\app\miniSCADA.dproj">
+				<Dependencies/>
+			</Projects>
 		</ItemGroup>
 		<ProjectExtensions>
 			<Borland.Personality>Default.Personality.12</Borland.Personality>
@@ -71,14 +74,23 @@
 		<Target Name="KRWeb:Make">
 			<MSBuild Projects="packages\d160\KRWeb.dproj" Targets="Make"/>
 		</Target>
+		<Target Name="miniSCADA">
+			<MSBuild Projects="T:\1\app\miniSCADA.dproj"/>
+		</Target>
+		<Target Name="miniSCADA:Clean">
+			<MSBuild Projects="T:\1\app\miniSCADA.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="miniSCADA:Make">
+			<MSBuild Projects="T:\1\app\miniSCADA.dproj" Targets="Make"/>
+		</Target>
 		<Target Name="Build">
-			<CallTarget Targets="KRCommon;KRAutomation;KRFile;KRGraphics;KRWeb"/>
+			<CallTarget Targets="KRCommon;KRAutomation;KRFile;KRGraphics;KRWeb;miniSCADA"/>
 		</Target>
 		<Target Name="Clean">
-			<CallTarget Targets="KRCommon:Clean;KRAutomation:Clean;KRFile:Clean;KRGraphics:Clean;KRWeb:Clean"/>
+			<CallTarget Targets="KRCommon:Clean;KRAutomation:Clean;KRFile:Clean;KRGraphics:Clean;KRWeb:Clean;miniSCADA:Clean"/>
 		</Target>
 		<Target Name="Make">
-			<CallTarget Targets="KRCommon:Make;KRAutomation:Make;KRFile:Make;KRGraphics:Make;KRWeb:Make"/>
+			<CallTarget Targets="KRCommon:Make;KRAutomation:Make;KRFile:Make;KRGraphics:Make;KRWeb:Make;miniSCADA:Make"/>
 		</Target>
 		<Import Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')" Project="$(BDS)\Bin\CodeGear.Group.Targets"/>
 	</Project>

@@ -14,11 +14,11 @@ interface
 
 uses
   {$IF CompilerVersion >= 23}
-    Winapi.MMSystem, System.Classes, System.SysUtils, System.Math, System.StrUtils,
+    WinApi.Windows, System.Classes, System.SysUtils, System.Math, System.StrUtils,
   {$ELSE}
-    MMSystem, Classes, SysUtils, Math, StrUtils,
+    Windows, Classes, SysUtils, Math, StrUtils,
   {$IFEND}
-  KRCOMPort, KRThread, KRRuntimeErrors, KRTypes, KRThreadQueue, Funcs;
+  KRCOMPort, KRThread, KRRuntimeErrors, KRTypes, KRThreadQueue, KRStrUtils;
 
 const
   KRMODEM_INIT_COMMNDS : array[0..14] of String = (
@@ -336,11 +336,16 @@ var
   i: integer;
 begin
   Result:=TStringList.Create;
-  sl:=Explode(',',AStr);
-  for I := 0 to sl.Count - 1 do begin
-    if Length(sl[i])>0 then
-      if sl[i][1]='"' then sl[i]:=copy(sl[i],2,Length(sl[i])-2);
-    Result.Add(sl[i]);
+  sl:=TStringList.Create;
+  try
+    KRSplitStr(AStr,',',sl);
+    for I := 0 to sl.Count - 1 do begin
+      if Length(sl[i])>0 then
+        if sl[i][1]='"' then sl[i]:=copy(sl[i],2,Length(sl[i])-2);
+      Result.Add(sl[i]);
+    end;
+  finally
+    sl.Free;
   end;
 end;
 
@@ -349,30 +354,34 @@ var
   sl: TStringList;
   i: integer;
 begin
-  sl:=Explode(#13#10,bf);
-  i:=0;
-  while i<sl.count do begin
-    if sl[i]='' then begin
-      sl.Delete(i);
-    end else if sl[i]='RING' then begin
-      Synchronize(RING);
-      sl.Delete(i);
-    end else if LeftStr(sl[i],7)='+CLIP: ' then begin
-      tmpStr:=sl[i];
-      Synchronize(CLIP);
-      sl.Delete(i);
-    end else if sl[i]='STOPRING' then begin
-      sl.Delete(i);
-    end else inc(i);
-  end;
+  sl:=TStringList.Create;
+  try
+    KRSplitStr(bf,#13#10,sl);
+    i:=0;
+    while i<sl.count do begin
+      if sl[i]='' then begin
+        sl.Delete(i);
+      end else if sl[i]='RING' then begin
+        Synchronize(RING);
+        sl.Delete(i);
+      end else if LeftStr(sl[i],7)='+CLIP: ' then begin
+        tmpStr:=sl[i];
+        Synchronize(CLIP);
+        sl.Delete(i);
+      end else if sl[i]='STOPRING' then begin
+        sl.Delete(i);
+      end else inc(i);
+    end;
 
-  bf:='';
-  for I := 0 to sl.Count - 1 do begin
-    if i>0 then bf:=bf+#13#10;
-    bf:=bf+sl[i];
-  end;
+    bf:='';
+    for I := 0 to sl.Count - 1 do begin
+      if i>0 then bf:=bf+#13#10;
+      bf:=bf+sl[i];
+    end;
 
-  sl.Free;
+  finally
+    sl.Free;
+  end;
 end;
 
 function TKRModemThread.isOK(AResult: String): boolean;
@@ -395,7 +404,7 @@ begin
     if FModem.FComPort.Connected then begin
 
       if FCommand=nil then begin
-        if(FState=msConnecting)or(ElapsedTime(FStartCmdTime)>30000)then begin
+        if(FState=msConnecting)or((getTickCount-FStartCmdTime)>30000)then begin
           New(FCommand);
           FCommand^.cmd:=AnsiString('AT'#13);
           FCommand^.data:='';
@@ -407,13 +416,13 @@ begin
         if FCommand<>nil then begin
           SendPack;
           FModem.FComPort.Write(FCommand^.cmd[1],Length(FCommand^.cmd));
-          FStartCmdTime:={$IF CompilerVersion >= 23}Winapi.{$IFEND}MMSystem.timeGetTime;
+          FStartCmdTime:=getTickCount;
         end;
       end;
 
 
       if FModem.FComPort.InputCount>0 then begin
-        tm0:={$IF CompilerVersion >= 23}Winapi.{$IFEND}MMSystem.timeGetTime;
+        tm0:=getTickCount;
         btRec:=0;
         SetLength(_buf,255);
         while true do begin
@@ -423,15 +432,15 @@ begin
             btRec:=btRec+FModem.FComPort.Read(Pointer(@_buf[btRec+1])^,min(255-btRec,i));
           REAddLog('btRec='+IntToStr(btRec));
             if btRec>254 then break;
-            tm0:={$IF CompilerVersion >= 23}Winapi.{$IFEND}MMSystem.timeGetTime;
+            tm0:=getTickCount;
             continue;
           end;
-          REAddLog('ElapsedTime='+IntToStr(ElapsedTime(tm0)));
-          if ElapsedTime(tm0)>FModem.FWaitRespTime then break;
+          REAddLog('ElapsedTime='+IntToStr((getTickCount-tm0)));
+          if (getTickCount-tm0)>FModem.FWaitRespTime then break;
         end;
 
         SetLength(_buf,btRec);
-        bf:=StringToWideString(_buf,1251);
+        bf:=String(_buf);
         RecvPack;
 
         isFn;
@@ -449,7 +458,7 @@ begin
       end;
 
       if FCommand<>nil then begin
-        if ElapsedTime(FStartCmdTime)>FCommand^.timeout then begin
+        if (getTickCount-FStartCmdTime)>FCommand^.timeout then begin
           SetLength(bf,0);
           FCommand^.callback(FModem,bf);
           Dispose(FCommand);

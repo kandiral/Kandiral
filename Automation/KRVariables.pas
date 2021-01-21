@@ -15,15 +15,19 @@ interface
 uses
   {$IF CompilerVersion >= 23}
     Winapi.Windows, Winapi.Messages, System.Classes, Vcl.ExtCtrls, Vcl.Forms,
-    System.Variants, System.SysUtils,
+    System.Variants, System.SysUtils, System.SyncObjs,
   {$ELSE}
-    Windows, Messages, Classes, ExtCtrls, Forms, Variants, SysUtils,
+    Windows, Messages, Classes, ExtCtrls, Forms, Variants, SysUtils, SyncObjs,
   {$IFEND}
-  KRComponentCollection, KRIniConfig, KRRuntimeErrors;
+  KRComponentCollection, KRIniConfig, KRRuntimeErrors, KRVariants;
 
+const
+  VARTHREAD_QUEUE_MAX_EVENTS = 16;
+    
 type
   TKRVariabels = class;
   TKRVariable = class;
+  TKRVarThread = class;
 
   TVarUpdateType = (vutBefore, vutAfter, vutAftUpdate);
   TVarType = (VT_BYTE, VT_WORD, VT_DWORD, VT_SMALLINT, VT_INT, VT_SINGLE,
@@ -36,120 +40,177 @@ type
     procedure VarErr(AVar: TKRVariable); stdcall;
   end;
 
+  TKRVarUpEvent = record
+    FEvent: integer;
+    FValue: variant;
+  end;
+
   TKRVariable = class(TKRComponentCollectionItem, IKRCfgParam)
   private
-    FVariabels: TKRVariabels;
-    FRuntimeErrorEv: TKRRuntimeErrorEv;
-    FValue: Variant;
-    FType: TVarType;
-    FUpdate: TValUpdate;
-    FUpdateType: TVarUpdateType;
-    FEError: TValUpdate;
-    FUpAftWrite: boolean;
-    FCfgInterval: TKRIniCfgParam;
+    FVariabels: TKRVariabels;    
+    FRuntimeErrorEv: TKRRuntimeErrorEv;    
     FList: TList;
+    FMonCount: integer;
+    FValue: Variant;
+    FType: TVarType;    
+    FUpdateType: TVarUpdateType;
+    FUpAftWrite: boolean;
+    FWaitForUpdates: boolean;
+    
     FUserError: boolean;
     FUserErrorMsg: String;
-    FInterval: Integer;
+    
+    FCfgInterval: TKRIniCfgParam;
     FCfgValue: TKRIniCfgParam;
     FCfgValueChange: boolean;
     FCfgValOnlySave: boolean;
-    FVarUpLock: boolean;
-    FVarLock: TObject;
+
+
+
+    CS: TCriticalSection;
     FWH: HWND;
-    FValUpdated: boolean;
-    FWaitForUpdates: boolean;
-    FErrorCounter: integer;
-    FErrorCount: integer;
-    procedure TmWP(var Msg: TMessage);
-    function GetInterval: Integer;
+    FIntervalMin, FRequestTM: cardinal;
+    FThread: TKRVarThread;
+    FInterval: Cardinal;
+    FEError: TValUpdate;
+    FUpdate: TValUpdate;
+
+    
     function GetUpAftWrite: boolean;
     procedure CfgParamChange(AParam: TKRIniCfgParam); stdcall;
     procedure SetUserError(const AValue: boolean);
     function GetRuntimeErrorEv: TKRRuntimeErrorEv;
     procedure SetRuntimeErrorEv(const AValue: TKRRuntimeErrorEv);
     procedure SetCfgValue(const AValue: TKRIniCfgParam);
-    procedure SetEError(const Value: TValUpdate);
-    procedure SetUpdate(const Value: TValUpdate);
-    procedure VarCSEnter;
-    procedure VarCSLeave;
-    function GetError_: integer;
-    procedure SetErrorCount(const Value: integer);
+
+
+    
+    procedure TmWP(var Msg: TMessage);
+    procedure SetInterval(const Value: Cardinal);
+    procedure SetValue(const AValue: Variant);virtual;
   protected
+    FAllowUpdate: boolean;
+
+
     procedure DoRuntimeError(ADesc: String; E: Exception);
     procedure _ParamChange(AParam: TKRIniCfgParam);virtual;
-    function GetValue: Variant;virtual;
-    procedure SetValueF(const AValue: Variant);
-    procedure SetValue(const AValue: Variant);virtual;
-    procedure SetValue_(const AValue: Variant);virtual;
-    procedure SetValue_c(AValue: Variant);virtual;
     procedure SetType(const AValue: TVarType);virtual;
     function GetError: integer;virtual;
-    procedure DoError(isUp: boolean);
-    function GetErrorMsg: String;virtual;
+    function GetErrorMsg: String;virtual;abstract;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
-    procedure UpdateValue_;virtual;
-    procedure UpdateValue_c(AVal: Variant);virtual;
-    procedure VarUpCS_Enter;
-    procedure VarUpCS_Leave;
-    procedure SetInterval(const AValue: Integer);
     procedure SetCfgInterval(const AValue: TKRIniCfgParam);
+
+
+    procedure Activate;
+    procedure Deactivate;
+    procedure DoError(AAsync: boolean = false);virtual;
+    procedure UpdateValueRequest;virtual;abstract;
+    procedure UpdateValueResponse(AVal: Variant; AAsync: boolean = false);virtual;
+    procedure SetValueRequest(var AValue: Variant);virtual;abstract;
+    procedure SetValueResponse(var AValue: Variant);virtual;
+    procedure SetValueCS(var AValue: Variant);
+    procedure SetValueNoCS(var AValue: Variant);
+    function GetValue: Variant;virtual;
   public
     constructor Create(AOwner: TComponent);override;
     destructor Destroy;override;
-    procedure UpdateValue;
+    property Value: Variant read GetValue write SetValue;
+
+
+    //----- 
     property ErrorMsg: String read GetErrorMsg;
-    property Error: integer read GetError_;
+    property Error: integer read GetError;
     procedure AddMon(AMon: IKRVarUp);
     procedure DelMon(AMon: IKRVarUp);
-    property Value: Variant read GetValue write SetValue;
-    property VarType: TVarType read FType write SetType default VT_WORD;
-    property Interval: Integer read GetInterval write SetInterval default 0;
     property CfgInterval: TKRIniCfgParam read FCfgInterval write SetCfgInterval;
     property CfgValue: TKRIniCfgParam read FCfgValue write SetCfgValue;
     property CfgValOnlySave: boolean read FCfgValOnlySave write FCfgValOnlySave default true;
-    property UpdateType: TVarUpdateType read FUpdateType write FUpdateType default vutAfter;
-    property OnValUpdated: TValUpdate read FUpdate write SetUpdate;
-    property OnError: TValUpdate read FEError write SetEError;
-    property UpAftWrite: boolean read GetUpAftWrite write FUpAftWrite default true;
     property UserError: boolean read FUserError write SetUserError default false;
     property UserErrorMsg: String read FUserErrorMsg write FUserErrorMsg;
-    property ValUpdated: boolean read FValUpdated;
+    // ----------
+
+    procedure UpdateValue;
+    
+    // Pubblished Propery
+    property VarType: TVarType read FType write SetType default VT_WORD;
+    property Interval: Cardinal read FInterval write SetInterval default 0;
+    property IntervalMin: cardinal read FIntervalMin write FIntervalMin default 5;
+    property UpdateType: TVarUpdateType read FUpdateType write FUpdateType default vutAfter;
+    property UpAftWrite: boolean read GetUpAftWrite write FUpAftWrite default true;
     property WaitForUpdates: boolean read FWaitForUpdates write FWaitForUpdates default false;
+
+    // Pubblished Events
     property OnRuntimeError: TKRRuntimeErrorEv read GetRuntimeErrorEv write SetRuntimeErrorEv;
-  published
-    property ErrorCount: integer read FErrorCount write SetErrorCount default 1;
+    property OnValUpdated: TValUpdate read FUpdate write FUpdate;
+    property OnError: TValUpdate read FEError write FEError;
+    
+  end;
+
+  TKRVarThread = class(TThread)
+  private
+    CS: TCriticalSection;
+    FCurValue: Variant;
+    FWaiting: boolean;
+    FVariable: TKRVariable;
+    FQueue: array[0..VARTHREAD_QUEUE_MAX_EVENTS-1] of TKRVarUpEvent;
+    FQueueCount, FQueuePosIn, FQueuePosOut: integer;
+
+    FEvents: array [0..6] of THandle;
+  protected
+    procedure Execute; override;
+    procedure evUpdate; virtual;
+    procedure evSetValue; virtual;
+    procedure evError; virtual;
+    procedure evUpdated; virtual;
+  public
+    constructor CreateTh;
+    destructor Destroy; override;
+    procedure Deactivate;
+    procedure push(var AValue: Variant);overload;        
+    procedure push;overload;
   end;
 
   TKRVariabels = class(TKRComponentCollection)
   private
+    CS: TCriticalSection;
     FRuntimeErrorEv: TKRRuntimeErrorEv;
     FActive: Boolean;
-    FReactionTime: word;
     function GetRuntimeErrorEv: TKRRuntimeErrorEv;
     procedure SetRuntimeErrorEv(const Value: TKRRuntimeErrorEv);
+    procedure SetActive(const Value: boolean);virtual;
+    function GetActive: boolean; virtual;
   protected
     procedure DoRuntimeError(ADesc: String; E: Exception);
     procedure AftAddItem(var AItem: TKRComponentCollectionItem);override;
-    procedure SetActive(const Value: boolean);virtual;
+
   public
     constructor Create(AOwner: TComponent);override;
-    property Active: boolean read FActive write SetActive;
+    destructor Destroy; override;
     procedure updateAllVariabels;
     procedure updateAllWaitingVariabels;
-  published
-    property ReactionTime: word read FReactionTime write FReactionTime default 5;
+
+    property Active: boolean read GetActive write SetActive;
     property OnRuntimeError: TKRRuntimeErrorEv read GetRuntimeErrorEv write SetRuntimeErrorEv;
   end;
 
 implementation
 
-uses Funcs, Math;
-
 var
   KRVariableID: Cardinal;
 
 { TKRVariable }
+
+procedure TKRVariable.Activate;
+begin
+  CS.Enter;
+  try
+    FThread:=TKRVarThread.CreateTh;
+    FThread.FVariable:=Self;    
+    if FInterval>0 then FThread.push;    
+  finally
+    CS.Leave;
+  end;
+end;
 
 procedure TKRVariable.AddMon(AMon: IKRVarUp);
 var
@@ -159,6 +220,7 @@ begin
     for i := 0 to FList.Count-1 do
       if FList.Items[i]=Pointer(AMon) then exit;
   FList.Add(Pointer(AMon));
+  FMonCount:=FList.Count;
 end;
 
 procedure TKRVariable.CfgParamChange(AParam: TKRIniCfgParam);
@@ -169,55 +231,81 @@ end;
 constructor TKRVariable.Create(AOwner: TComponent);
 begin
   inherited;
-  FErrorCount:=1;
-  FErrorCounter:=0;
-  FValUpdated:=false;
+
+  CS:=TCriticalSection.Create;
+  FAllowUpdate:=true;
+  FInterval:=0;
+  FIntervalMin:=5;
+  FWH := AllocateHWnd(tmWP);
+  FMonCount:=0;
+  FList:=TList.Create;
+
+
   FWaitForUpdates:=false;
   Inc(KRVariableID);
-  FVarLock:=TObject.Create;
   FUserError:=false;
-  FList:=TList.Create;
   FUpdateType:=vutAfter;
   FType:=VT_WORD;
   FUpAftWrite:=true;
   FCfgValueChange:=false;
   FCfgValOnlySave:=true;
-  FWH := AllocateHWnd(tmWP);
-  FVarUpLock:=false;
+end;
+
+procedure TKRVariable.Deactivate;
+begin
+  CS.Enter;
+  try
+    if FThread=nil then exit;
+    KillTimer(FWH, 1);
+    FThread.Deactivate;
+    FreeAndNil(FThread);
+  finally
+    CS.Leave;
+  end;
 end;
 
 procedure TKRVariable.DelMon(AMon: IKRVarUp);
 begin
   FList.Remove(Pointer(AMon));
+  FMonCount:=FList.Count;
 end;
 
 destructor TKRVariable.Destroy;
 begin
   KillTimer(FWH, 1);
-  KillTimer(FWH, 2);
-  KillTimer(FWH, 3);
-  DeallocateHWnd(FWH);
+  Deactivate;
+
+
   if Assigned(FCfgInterval) then FCfgInterval.DelMon(Self);
   if Assigned(FCfgValue) then FCfgValue.DelMon(Self);
   FList.Free;
-  FVarLock.Free;
+
+
+
+  DeallocateHWnd(FWH);
+  CS.Free;
+
   inherited;
 end;
 
-procedure TKRVariable.DoError(isUp: boolean);
+procedure TKRVariable.DoError(AAsync: boolean = false);
+var
+  tm: cardinal;
 begin
-  inc(FErrorCounter);
-  KillTimer(FWH, 1);
-  if FInterval>0 then begin
-    {if isUp then }SetTimer(FWH, 1, FInterval, nil);
-  end else if FWaitForUpdates and (not FValUpdated) then SetTimer(FWH, 1, 1000, nil);
-  if FErrorCounter=FErrorCount then begin
-    inc(FErrorCounter);
-    KillTimer(FWH, 3);
-    SetTimer(FWH, 3, FVariabels.FReactionTime, nil);
-    //FErrorCounter:=0;
+  CS.Enter;
+  try
+    if FThread=nil then exit;
+    if AAsync then SetEvent(FThread.FEvents[6]) else begin
+      SetEvent(FThread.FEvents[2]);
+      if FInterval>0 then begin
+        tm:=getTickCount-FRequestTM;
+        if(tm>FInterval)or(FInterval-tm<FIntervalMin)then tm:=FIntervalMin else tm:=FInterval-tm;
+        SetTimer(FWH, 1, tm, nil);
+      end else if FWaitForUpdates then FThread.push;
+    end;
+  finally
+    CS.Leave;
   end;
-  VarUpCS_Leave;
 end;
 
 procedure TKRVariable.DoRuntimeError(ADesc: String; E: Exception);
@@ -228,21 +316,6 @@ end;
 function TKRVariable.GetError: integer;
 begin
   Result:=0;
-end;
-
-function TKRVariable.GetErrorMsg: String;
-begin
-
-end;
-
-function TKRVariable.GetError_: integer;
-begin
-  if FErrorCounter>FErrorCount then Result:=GetError else Result:=0;
-end;
-
-function TKRVariable.GetInterval: Integer;
-begin
-  Result:=FInterval;
 end;
 
 function TKRVariable.GetRuntimeErrorEv: TKRRuntimeErrorEv;
@@ -259,9 +332,12 @@ end;
 
 function TKRVariable.GetValue: Variant;
 begin
-  VarCSEnter;
-  Result:=FValue;
-  VarCSLeave;
+  CS.Enter;
+  try
+    Result:=FValue;
+  finally
+    CS.Leave;
+  end;
 end;
 
 procedure TKRVariable.Notification(AComponent: TComponent;
@@ -299,26 +375,19 @@ begin
   end;
 end;
 
-procedure TKRVariable.SetEError(const Value: TValUpdate);
+procedure TKRVariable.SetInterval(const Value: Cardinal);
+var
+  oldVl: integer;
 begin
-  FEError:=Value;
-end;
-
-procedure TKRVariable.SetErrorCount(const Value: integer);
-begin
-  FErrorCount := Value;
-  if FErrorCount<1 then FErrorCount:=1;
-  if FErrorCount>100 then FErrorCount:=100;  
-end;
-
-procedure TKRVariable.SetInterval(const AValue: Integer);
-begin
-  if FInterval<>AValue then begin
-    KillTimer(FWH, 1);
-    FInterval:=AValue;
-    if FInterval<1 then FInterval:=0 else
-      SetTimer(FWH, 1, FInterval, nil);
-    if Assigned(CfgInterval) then CfgInterval.Value:=FInterval;
+  if FInterval=Value then exit;
+  oldVl:=FInterval;
+  FInterval:=Value;  
+  CS.Enter;
+  try
+    if FThread=nil then exit;  
+    if oldVl=0 then FThread.push;    
+  finally
+    CS.Leave;
   end;
 end;
 
@@ -330,19 +399,39 @@ begin
 end;
 
 procedure TKRVariable.SetType(const AValue: TVarType);
+var
+  bt: byte;
+  wd: word;
+  dw: cardinal;
+  ddw: uint64;
+  i0: Smallint;
+  i1: integer;
+  i2: int64;
+  f0: Single;
+  f1: double;
+  s: String;
+  vr: variant;
 begin
   if FType<>AValue then begin
-    FType := AValue;
-    case FType of
-      VT_STRING: SetValueF('')
-      else SetValueF(0);
+    CS.Enter;
+    try
+      FType := AValue;
+      case FType of
+        VT_BYTE: begin bt:=0;vr:=bt;SetValueNoCS(vr);end;
+        VT_WORD: begin wd:=0;vr:=wd;SetValueNoCS(vr);end;
+        VT_DWORD: begin dw:=0;vr:=dw;SetValueNoCS(vr);end;
+        VT_UINT64: begin ddw:=0;vr:=ddw;SetValueNoCS(vr);end;
+        VT_SMALLINT: begin i0:=0;vr:=i0;SetValueNoCS(vr);end;
+        VT_INT: begin i1:=0;vr:=i1;SetValueNoCS(vr);end;
+        VT_INT64: begin i2:=0;vr:=i2;SetValueNoCS(vr);end;
+        VT_SINGLE: begin f0:=0;vr:=f0;SetValueNoCS(vr);end;
+        VT_DOUBLE: begin f1:=0;vr:=f1;SetValueNoCS(vr);end;
+        VT_STRING: begin s:='';vr:=s;SetValueNoCS(vr);end;
+      end;
+    finally
+      CS.Leave;
     end;
   end;
-end;
-
-procedure TKRVariable.SetUpdate(const Value: TValUpdate);
-begin
-  FUpdate := Value;
 end;
 
 procedure TKRVariable.SetUserError(const AValue: boolean);
@@ -351,105 +440,99 @@ begin
 end;
 
 procedure TKRVariable.SetValue(const AValue: Variant);
+var
+  vr: Variant;
 begin
-  if FUpdateType=vutBefore then SetValueF(AValue);
-  SetValue_(AValue);
+  CS.Enter;
+  try
+    if FThread=nil then exit;
+    vr:=AValue;
+    if FUpdateType=vutBefore then SetValueNoCS(vr);
+    FThread.push(vr);
+  finally
+    CS.Leave;
+  end;
 end;
 
-procedure TKRVariable.SetValueF(const AValue: Variant);
+procedure TKRVariable.SetValueCS(var AValue: Variant);
 begin
-  VarCSEnter;
+  CS.Enter;
+  try
+    SetValueNoCS(AValue);
+  finally
+    CS.Leave;
+  end;
+end;
+
+procedure TKRVariable.SetValueNoCS(var AValue: Variant);
+begin
+  if KRVarIsEqually(AValue, FValue) then exit;
   FValue:=AValue;
-  if assigned(FCfgValue)and(not IsVariantsEqual(FValue,FCfgValue.Value))then begin
+  if assigned(FCfgValue)then begin
     FCfgValueChange:=true;
     FCfgValue.Value:=FValue;
     FCfgValueChange:=false;
   end;
-  VarCSLeave;
 end;
 
-procedure TKRVariable.SetValue_(const AValue: Variant);
+procedure TKRVariable.SetValueResponse(var AValue: Variant);
 begin
-  VarUpCS_Enter;
-end;
-
-procedure TKRVariable.SetValue_c(AValue: Variant);
-begin
-  FErrorCounter:=0;
-  if FUpdateType=vutAfter then SetValueF(AValue);
-  VarUpCS_Leave;
+  CS.Enter;
+  try
+    if FThread=nil then exit;
+    if FUpdateType=vutAfter then SetValueNoCS(AValue);
+    SetEvent(FThread.FEvents[4]);
+  finally
+    CS.Leave;
+  end;
   if FUpAftWrite then UpdateValue;
 end;
 
 procedure TKRVariable.TmWP(var Msg: TMessage);
-var i: integer;
 begin
-  if Msg.Msg=WM_TIMER then begin
-    case Msg.WParam of
-    1: begin
-        KillTimer(FWH, 1);
-        if FVariabels.FActive then UpdateValue_ else
-          if FInterval>0 then SetTimer(FWH, 1, FInterval, nil);
-      end;
-    2: begin
-        KillTimer(FWH, 2);
-        if Assigned(FUpdate) then FUpdate(self,Self);
-        for I := 0 to FList.Count-1 do IKRVarUp(FList.Items[i]).VarUp(Self);
-      end;
-    3: begin
-        KillTimer(FWH, 3);
-        if Assigned(FEError) then FEError(self,Self);
-        for I := 0 to FList.Count-1 do IKRVarUp(FList.Items[i]).VarErr(Self);
-      end;
+  if(Msg.Msg=WM_TIMER)and(Msg.WParam=1)then begin
+    KillTimer(FWH, 1);
+    CS.Enter;
+    try
+      if FThread=nil then exit;
+      FThread.push;
+    finally
+      CS.Leave;
     end;
   end else Msg.Result := DefWindowProc(FWH, Msg.Msg, Msg.wParam, Msg.lParam);
 end;
 
 procedure TKRVariable.UpdateValue;
 begin
-  if FInterval=0 then begin
-    FValUpdated:=false;
-    KillTimer(FWH, 1);
-    SetTimer(FWH, 1, FVariabels.FReactionTime, nil);
+  CS.Enter;
+  try
+    if FThread=nil then exit;
+    if(FInterval>0)or(not FAllowUpdate)then exit;
+    FThread.push;
+  finally
+    CS.Leave;
   end;
 end;
 
-procedure TKRVariable.UpdateValue_;
+procedure TKRVariable.UpdateValueResponse(AVal: Variant; AAsync: boolean);
+var
+  tm: Cardinal;
 begin
-  VarUpCS_Enter;
-end;
-
-procedure TKRVariable.UpdateValue_c(AVal: Variant);
-begin
-  FErrorCounter:=0;
-  FValUpdated:=true;
-  SetValueF(AVal);
-  KillTimer(FWH, 1);
-  if FInterval>0 then SetTimer(FWH, 1, FInterval, nil);
-  KillTimer(FWH, 2);
-  SetTimer(FWH, 2, FVariabels.FReactionTime, nil);
-  VarUpCS_Leave;
-end;
-
-procedure TKRVariable.VarCSEnter;
-begin
-  System.TMonitor.Enter(FVarLock);
-end;
-
-procedure TKRVariable.VarCSLeave;
-begin
-  System.TMonitor.Exit(FVarLock);
-end;
-
-procedure TKRVariable.VarUpCS_Enter;
-begin
-  while FVarUpLock do Application.ProcessMessages;
-  FVarUpLock:=true;
-end;
-
-procedure TKRVariable.VarUpCS_Leave;
-begin
-  FVarUpLock:=false;
+  CS.Enter;
+  try
+    SetValueNoCS(AVal);
+    if FThread=nil then exit;
+    if AAsync then SetEvent(FThread.FEvents[5]) else begin
+      SetEvent(FThread.FEvents[3]);
+      if FInterval>0 then begin
+        tm:=getTickCount-FRequestTM;
+        if(tm>FInterval)or(FInterval-tm<FIntervalMin)then tm:=FIntervalMin else tm:=FInterval-tm;
+        SetTimer(FWH, 1, tm, nil);
+      end;
+    end;
+  finally
+    CS.Leave;
+  end;
 end;
 
 procedure TKRVariable._ParamChange(AParam: TKRIniCfgParam);
@@ -467,6 +550,158 @@ begin
   end;
 end;
 
+{ TKRVarThread }
+
+constructor TKRVarThread.CreateTh;
+begin
+  FWaiting:=false;
+  CS:=TCriticalSection.Create;
+  FEvents[0]:=CreateEvent(nil, true, false, nil);
+  FEvents[1]:=CreateEvent(nil, true, false, nil);
+  FEvents[2]:=CreateEvent(nil, true, false, nil);
+  FEvents[3]:=CreateEvent(nil, true, false, nil);
+  FEvents[4]:=CreateEvent(nil, true, false, nil);
+  FEvents[5]:=CreateEvent(nil, true, false, nil);
+  FEvents[6]:=CreateEvent(nil, true, false, nil);
+  inherited Create(false);
+end;
+
+procedure TKRVarThread.Deactivate;
+begin
+  Terminate;
+  SetEvent(FEvents[0]);
+end;
+
+destructor TKRVarThread.Destroy;
+begin
+  Deactivate;
+  inherited;
+end;
+
+procedure TKRVarThread.evError;
+var
+  i,n: integer;
+begin
+  if Assigned(FVariable.FEError) then FVariable.FEError(FVariable,FVariable);
+  n:=FVariable.FList.Count-1;
+  for i := 0 to n do IKRVarUp(FVariable.FList.Items[i]).VarErr(FVariable);
+end;
+
+procedure TKRVarThread.evSetValue;
+begin
+  FVariable.SetValueRequest(FCurValue);
+end;
+
+procedure TKRVarThread.evUpdate;
+begin
+  FVariable.UpdateValueRequest;
+end;
+
+procedure TKRVarThread.evUpdated;
+var
+  i,n: integer;
+begin
+  if Assigned(FVariable.FUpdate) then FVariable.FUpdate(FVariable,FVariable);
+  n:=FVariable.FList.Count-1;
+  for i := 0 to n do IKRVarUp(FVariable.FList.Items[i]).VarUp(FVariable);
+end;
+
+procedure TKRVarThread.Execute;
+var
+  Signal: Cardinal;
+  FCurEvent: integer;
+begin
+  while not Terminated do begin
+    Signal:=WaitForMultipleObjects(7, @FEvents, False, INFINITE);
+    case Signal of
+      WAIT_OBJECT_0 + 1: begin // QueueEvent
+        CS.Enter;
+        FCurEvent:=FQueue[FQueuePosOut].FEvent;
+        FCurValue:=FQueue[FQueuePosOut].FValue;
+        if FQueuePosOut=VARTHREAD_QUEUE_MAX_EVENTS-1 then FQueuePosOut:=0 else inc(FQueuePosOut);
+        dec(FQueueCount);
+        FWaiting:=true;
+        ResetEvent(FEvents[1]);
+        CS.Leave;
+        if FCurEvent=0 then
+          Synchronize(evUpdate)
+        else
+          Synchronize(evSetValue);
+      end;
+      WAIT_OBJECT_0 + 2: begin // ErrorEvent
+        ResetEvent(FEvents[2]);
+        if Assigned(FVariable.FEError) or (FVariable.FMonCount>0) then Synchronize(evError);
+        CS.Enter;
+        FWaiting:=false;
+        if FQueueCount>0 then SetEvent(FEvents[1]);
+        CS.Leave;
+      end;
+      WAIT_OBJECT_0 + 3: begin // UpdatedEvent
+        ResetEvent(FEvents[3]);
+        if Assigned(FVariable.FUpdate) or (FVariable.FMonCount>0) then Synchronize(evUpdated);
+        CS.Enter;
+        FWaiting:=false;
+        if FQueueCount>0 then SetEvent(FEvents[1]);
+        CS.Leave;
+      end;
+      WAIT_OBJECT_0 + 4: begin // SetValue completed
+        ResetEvent(FEvents[4]);
+        CS.Enter;
+        FWaiting:=false;
+        if FQueueCount>0 then SetEvent(FEvents[1]);
+        CS.Leave;
+      end;
+      WAIT_OBJECT_0 + 5: begin // UpdatedEvent Async
+        ResetEvent(FEvents[5]);
+        if Assigned(FVariable.FUpdate) or (FVariable.FMonCount>0) then Synchronize(evUpdated);
+      end;
+      WAIT_OBJECT_0 + 6: begin // ErrorEvent Async
+        ResetEvent(FEvents[6]);
+        if Assigned(FVariable.FEError) or (FVariable.FMonCount>0) then Synchronize(evError);
+      end
+      else break;
+    end;
+  end;
+
+  CloseHandle(FEvents[0]);
+  CloseHandle(FEvents[1]);
+  CloseHandle(FEvents[2]);
+  CloseHandle(FEvents[3]);
+  CloseHandle(FEvents[4]);
+  CloseHandle(FEvents[5]);
+  CloseHandle(FEvents[6]);
+  CS.Free;
+end;
+
+procedure TKRVarThread.push;
+begin
+  if FQueueCount=VARTHREAD_QUEUE_MAX_EVENTS then begin
+    //  Overflow. I hope this never happens :)
+  end else begin
+    CS.Enter;
+    FQueue[FQueuePosIn].FEvent:=0;
+    if FQueuePosIn=VARTHREAD_QUEUE_MAX_EVENTS-1 then FQueuePosIn:=0 else inc(FQueuePosIn);
+    inc(FQueueCount);
+    if not FWaiting then SetEvent(FEvents[1]);
+    CS.Leave;
+  end;
+end;
+
+procedure TKRVarThread.push(var AValue: Variant);
+begin
+  if FQueueCount=VARTHREAD_QUEUE_MAX_EVENTS then begin
+    //  Overflow. I hope this never happens :)
+  end else begin
+    CS.Enter;
+    FQueue[FQueuePosIn].FEvent:=1;
+    FQueue[FQueuePosIn].FValue:=AValue;
+    if FQueuePosIn=VARTHREAD_QUEUE_MAX_EVENTS-1 then FQueuePosIn:=0 else inc(FQueuePosIn);
+    inc(FQueueCount);
+    if not FWaiting then SetEvent(FEvents[1]);
+    CS.Leave;
+  end;
+end;
+
 { TKRVariabels }
 
 procedure TKRVariabels.AftAddItem(var AItem: TKRComponentCollectionItem);
@@ -476,13 +711,27 @@ end;
 
 constructor TKRVariabels.Create(AOwner: TComponent);
 begin
-  FReactionTime:=5;
+  CS:=TCriticalSection.Create;
+  FActive:=false;
+  inherited;
+end;
+
+destructor TKRVariabels.Destroy;
+begin
+  CS.Free;
   inherited;
 end;
 
 procedure TKRVariabels.DoRuntimeError(ADesc: String; E: Exception);
 begin
   REEvent(FRuntimeErrorEv,Self,ADesc,E);
+end;
+
+function TKRVariabels.GetActive: boolean;
+begin
+  CS.Enter;
+  Result:=FActive;
+  CS.Leave;
 end;
 
 function TKRVariabels.GetRuntimeErrorEv: TKRRuntimeErrorEv;
@@ -493,9 +742,20 @@ begin
 end;
 
 procedure TKRVariabels.SetActive(const Value: boolean);
+var
+  i: integer;
 begin
-  FActive := Value;
-  if not FActive then Sleep(1000);
+  if Value=FActive then exit;
+  CS.Enter;
+  FActive:=Value;
+  try
+    if FActive then 
+      for i := 0 to ItemsCount-1 do TKRVariable(Items[i]).Activate
+    else
+      for i := 0 to ItemsCount-1 do TKRVariable(Items[i]).Deactivate;
+  finally
+    CS.Leave;
+  end;
 end;
 
 procedure TKRVariabels.SetRuntimeErrorEv(const Value: TKRRuntimeErrorEv);
@@ -520,8 +780,7 @@ var
 begin
   for i := 0 to ItemsCount-1 do begin
     vr:=TKRVariable(Items[i]);
-    if vr.WaitForUpdates then
-      vr.UpdateValue;
+    if vr.WaitForUpdates then vr.UpdateValue;
   end;
 end;
 

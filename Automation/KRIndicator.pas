@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRIndicator                                                               *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 31.08.2017                                                          *)
 (*  https://kandiral.ru/delphi/krindicator.pas.html                           *)
 (*                                                                            *)
 (******************************************************************************)
@@ -14,17 +14,18 @@ interface
 
 uses
   {$IF CompilerVersion >= 23}
-    System.Classes, Vcl.Controls, Winapi.Messages, Vcl.Graphics, Vcl.ExtCtrls, Vcl.Forms,
+    System.Classes, Vcl.Controls, Winapi.Messages, Vcl.Graphics, Vcl.ExtCtrls,
+    Vcl.Forms, System.Variants, System.Math, System.SysUtils,
   {$ELSE}
-    Classes, Controls, Messages, Graphics, ExtCtrls, Forms,
+    Classes, Controls, Messages, Graphics, ExtCtrls, Forms, Variants, Math, SysUtils,
   {$IFEND}
-  KRVariables, KRBoundLabel, KRTimer;
+  KRVariables, KRBoundLabel, KRVariants;
 
 type
   TKRIndicatorState = (istOn, istOff, istError);
   TKRIndicatorType = (itpOnHi, itpOnLow, itpBit);
 
-  TKRIndicator = class(TShape, IKRTimer)
+  TKRIndicator = class(TShape, IKRVarUp)
   private
     FPenOff: TPen;
     FBrushOff: TBrush;
@@ -38,7 +39,8 @@ type
     FIndicatorType: TKRIndicatorType;
     FLimit: Variant;
     FStateChanged: TNotifyEvent;
-    FTimer: TKRTimer;
+    FOldValue: Variant;
+    FOldError: integer;
     procedure SetBrushOff(const Value: TBrush);
     procedure SetBrushOn(const Value: TBrush);
     procedure SetPenOff(const Value: TPen);
@@ -49,12 +51,12 @@ type
     procedure SetBit(const Value: byte);
     procedure SetIndicatorType(const Value: TKRIndicatorType);
     procedure SetLimit(const Value: Variant);
-    procedure SetTimer(const Value: TKRTimer);
+    procedure VarUp(AVar: TKRVariable); stdcall;
+    procedure VarErr(AVar: TKRVariable); stdcall;
   protected
     procedure Paint; override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
-    procedure DoTimer; stdcall;
-    function upState: boolean;
+    procedure DoTimer(AChanged: boolean = false);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -66,7 +68,6 @@ type
     property Bit: byte read FBit write SetBit;
     property Limit: Variant read FLimit write SetLimit;
     property OnStateChanged: TNotifyEvent read FStateChanged write FStateChanged;
-    property Timer: TKRTimer read FTimer write SetTimer;
     property Align;
     property Anchors;
     property BrushOn: TBrush read FBrushOn write SetBrushOn;
@@ -124,13 +125,13 @@ type
 
 implementation
 
-uses lgop;
-
 { TKRIndicator }
 
 constructor TKRIndicator.Create(AOwner: TComponent);
 begin
   inherited;
+  FOldValue:=null;
+  FOldError:=-8723982;
   FIndicatorState:=istError;
   FPenOn := TPen.Create;
   FPenOn.Color:=clBlack;
@@ -150,14 +151,12 @@ begin
   FBrushErr := TBrush.Create;
   FBrushErr.Color:=clGray;
   FBrushErr.OnChange := StyleChanged;
+  doTimer(true);
 end;
 
 destructor TKRIndicator.Destroy;
 begin
-  if(Assigned(FTimer))then begin
-    while FTimer.Working do Application.ProcessMessages;
-    FTimer.DelMon(Self);
-  end;
+  if(Assigned(FVariable))then FVariable.DelMon(Self);
   FPenOn.Free;
   FBrushOn.Free;
   FPenOff.Free;
@@ -167,9 +166,32 @@ begin
   inherited;
 end;
 
-procedure TKRIndicator.DoTimer;
+procedure TKRIndicator.DoTimer(AChanged: boolean = false);
+var
+  _st: TKRIndicatorState;
 begin
-  if upState then Invalidate;
+  if not Assigned(FVariable) then exit;
+
+  if AChanged or(not KRVarIsEqually(FVariable.Value,FOldValue))or(FOldError<>FVariable.Error)then begin
+
+    FOldValue:=FVariable.Value;
+    FOldError:=FVariable.Error;
+
+    _st:=istError;
+    if(FOldError=0)then case FIndicatorType of
+      itpOnHi: if FVariable.Value>FLimit then _st:=istOn else _st:=istOff;
+      itpOnLow: if FVariable.Value<FLimit then _st:=istOn else _st:=istOff;
+      itpBit: if (Integer(FVariable.Value) and (integer(1) shl FBit))>0 then
+        _st:=istOn else _st:=istOff;
+    end;
+
+    if _st<>FIndicatorState then begin
+      FIndicatorState:=_st;
+      if Assigned(FStateChanged) then FStateChanged(Self);
+      Invalidate;
+    end;
+
+  end;
 end;
 
 procedure TKRIndicator.Notification(AComponent: TComponent;
@@ -177,10 +199,7 @@ procedure TKRIndicator.Notification(AComponent: TComponent;
 begin
   inherited;
   if(Operation = opRemove)then
-    if (AComponent = FVariable)then FVariable:= nil else
-    if(AComponent=FTimer)then begin
-      FTimer:=nil;
-    end;
+    if (AComponent = FVariable)then FVariable:=nil;
 end;
 
 procedure TKRIndicator.Paint;
@@ -205,98 +224,87 @@ end;
 procedure TKRIndicator.SetBit(const Value: byte);
 begin
   FBit := Value;
-  Invalidate;
+  DoTimer(true);
 end;
 
 procedure TKRIndicator.SetBrushErr(const Value: TBrush);
 begin
   FBrushErr.Assign(Value);
+  DoTimer(true);
 end;
 
 procedure TKRIndicator.SetBrushOff(const Value: TBrush);
 begin
   FBrushOff.Assign(Value);
+  DoTimer(true);
 end;
 
 procedure TKRIndicator.SetBrushOn(const Value: TBrush);
 begin
   FBrushOn.Assign(Value);
+  DoTimer(true);
 end;
 
 procedure TKRIndicator.SetIndicatorType(const Value: TKRIndicatorType);
 begin
   FIndicatorType := Value;
-  Invalidate;
+  DoTimer(true);
 end;
 
 procedure TKRIndicator.SetLimit(const Value: Variant);
 begin
   FLimit := Value;
-  Invalidate;
+  DoTimer(true);
 end;
 
 procedure TKRIndicator.SetPenErr(const Value: TPen);
 begin
   FPenErr.Assign(Value);
+  DoTimer(true);
 end;
 
 procedure TKRIndicator.SetPenOff(const Value: TPen);
 begin
   FPenOff.Assign(Value);
+  DoTimer(true);
 end;
 
 procedure TKRIndicator.SetPenOn(const Value: TPen);
 begin
   FPenOn.Assign(Value);
-end;
-
-procedure TKRIndicator.SetTimer(const Value: TKRTimer);
-begin
-  if FTimer<>Value then begin
-    if(Assigned(FTimer))then begin
-      while FTimer.Working do Application.ProcessMessages;
-      FTimer.DelMon(Self);
-    end;
-    FTimer := Value;
-    if(Assigned(FTimer))then begin
-      FTimer.FreeNotification(Self);
-      while FTimer.Working do Application.ProcessMessages;
-      FTimer.AddMon(Self);
-    end;
-  end;
+  DoTimer(true);
 end;
 
 procedure TKRIndicator.SetVariable(const Value: TKRVariable);
 begin
   if FVariable<>Value then begin
+    if Assigned(FVariable) then begin
+      FVariable.DelMon(Self);
+      FVariable.RemoveFreeNotification(Self);
+    end;
     FVariable := Value;
     if Assigned(FVariable) then begin
       FVariable.FreeNotification(Self);
+      FVariable.AddMon(Self);
     end;
   end;
+  DoTimer(true);
 end;
 
 procedure TKRIndicator.Update;
 begin
-  if upState then Invalidate;
   inherited;
+  DoTimer(true);
 end;
 
-function TKRIndicator.upState: boolean;
-var
-  _st: TKRIndicatorState;
+procedure TKRIndicator.VarErr(AVar: TKRVariable);
 begin
-  _st:=istError;
-  if(Assigned(FVariable))and(FVariable.Error=0)then case FIndicatorType of
-    itpOnHi: if FVariable.Value>FLimit then _st:=istOn else _st:=istOff;
-    itpOnLow: if FVariable.Value<FLimit then _st:=istOn else _st:=istOff;
-    itpBit: if GetBit(FVariable.Value,FBit) then _st:=istOn else _st:=istOff;
-  end;
-  result:=_st<>FIndicatorState;
-  if result then begin
-    FIndicatorState:=_st;
-    if Assigned(FStateChanged) then FStateChanged(Self);
-  end;
+  DoTimer(true);
+end;
+
+procedure TKRIndicator.VarUp(AVar: TKRVariable);
+begin
+  DoTimer;
 end;
 
 { TKRBLIndicator }

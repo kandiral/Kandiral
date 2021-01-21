@@ -14,9 +14,9 @@ interface
 
 uses
   {$IF CompilerVersion >= 23}
-    System.Classes,
+    Winapi.Windows, System.Classes,
   {$ELSE}
-    Classes,
+    Windows, Classes,
   {$IFEND}
   KRServer, KRTypes, KRCRC, KRWindows;
 
@@ -45,8 +45,6 @@ type
 
 implementation
 
-uses lgop, Funcs;
-
 { TKRTPServer }
 
 function TKRTPServer.BuildResp(Sender: TObject; APack: PKRBuffer; ALength: integer): integer;
@@ -68,7 +66,7 @@ procedure TKRTPServer.cb(Sender: TObject; APack: PKRBuffer; var ALength: integer
 begin
   if(ALength>5)then begin
     if(APack^[0]=126)and(APack^[ALength-3]=64)then begin
-      if KRCRC16(APack,ALength-2)=BytesToWord(APack^[ALength-1],APack^[ALength-2]) then begin
+      if KRCRC16(APack,ALength-2)=MakeWord(APack^[ALength-1],APack^[ALength-2]) then begin
         ALength:=buildResp(Sender,APack,ALength);
         exit;
       end;
@@ -96,7 +94,7 @@ function TKRTPServer.funcGetName(APack: PKRBuffer): integer;
 var i,n: integer;
 s: AnsiString;
 begin
-  s:=WideStringToString(FTPName,1251);
+  s:=AnsiString(FTPName);
   n:=Length(s);
   if n>127 then n:=127;
   for i := 1 to n do APack^[2+i]:=ord(s[i]);

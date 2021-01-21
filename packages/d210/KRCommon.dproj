@@ -119,20 +119,28 @@
         <DCCReference Include="..\..\Net\KRTCPSocketClient.pas"/>
         <DCCReference Include="..\..\Net\KRTCPSocketServer.pas"/>
         <DCCReference Include="..\..\Utils\funcs.pas"/>
-        <DCCReference Include="..\..\Utils\KRCRC.pas"/>
-        <DCCReference Include="..\..\Utils\KRHTMLParseUtils.pas"/>
         <DCCReference Include="..\..\Utils\KRRuntimeErrors.pas"/>
-        <DCCReference Include="..\..\Utils\KRStreamCoder.pas"/>
         <DCCReference Include="..\..\Utils\KRStrUtils.pas"/>
         <DCCReference Include="..\..\Utils\KRTypes.pas"/>
         <DCCReference Include="..\..\Utils\KRWindows.pas"/>
         <DCCReference Include="..\..\Utils\lgop.pas"/>
-        <DCCReference Include="..\..\Utils\md5.pas"/>
         <DCCReference Include="KRCommonRegister.pas"/>
         <DCCReference Include="..\..\Net\KRUDPSocketServer.pas"/>
         <DCCReference Include="..\..\Common\KRBLEdit.pas"/>
-        <DCCReference Include="..\..\Utils\ISO3166.pas"/>
         <DCCReference Include="..\..\Utils\uLkJSON.pas"/>
+        <DCCReference Include="..\..\ISO\ISO3166.pas"/>
+        <DCCReference Include="..\..\Crypting\KRBase64.pas"/>
+        <DCCReference Include="..\..\Crypting\KRBCrypt.pas"/>
+        <DCCReference Include="..\..\Crypting\KRCRC.pas"/>
+        <DCCReference Include="..\..\Crypting\KRCryptCommon.pas"/>
+        <DCCReference Include="..\..\Utils\KRDateTime.pas"/>
+        <DCCReference Include="..\..\Utils\KRLogical.pas"/>
+        <DCCReference Include="..\..\Utils\KRMsgBox.pas"/>
+        <DCCReference Include="..\..\Utils\KRUtils.pas"/>
+        <DCCReference Include="..\..\Utils\KRVariants.pas"/>
+        <DCCReference Include="..\..\Common\KRValueEditLng.pas"/>
+        <DCCReference Include="..\..\Common\KRThreadEvent.pas"/>
+        <DCCReference Include="..\..\Common\KRThreadQueueEvent.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

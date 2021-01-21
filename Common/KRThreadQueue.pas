@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRThreadQueue                                                             *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 31.08.2017                                                          *)
 (*  https://kandiral.ru/delphi/krthreadqueue.pas.html                         *)
 (*                                                                            *)
 (******************************************************************************)
@@ -12,48 +12,68 @@ unit KRThreadQueue;
 
 interface
 
-uses Contnrs;
+uses
+  {$IF CompilerVersion >= 23}
+    System.Classes;
+  {$ELSE}
+    Classes;
+  {$IFEND}
 
 type
-  TKRThreadQueue = class(TOrderedList)
+  TKRThreadQueue = class(TObject)
   private
     FLock: TObject;
-  protected
-    procedure PushItem(AItem: Pointer); override;
-    function PopItem: Pointer; override;
-    function PeekItem: Pointer; override;
+    FList: TList;
   public
     constructor Create;
     destructor Destroy; override;
-
+    procedure Clear;
+    function Count: Integer;
+    function AtLeast(ACount: Integer): Boolean;
+    procedure Push(AItem: Pointer);
+    function Pop: Pointer;
+    function Peek: Pointer;
     procedure LockQueue;
     procedure UnlockQueue;
-    procedure Clear;
   end;
 
 implementation
 
 { TKRThreadQueue }
 
+function TKRThreadQueue.AtLeast(ACount: Integer): Boolean;
+begin
+  TMonitor.Enter(FLock);
+  Result:=FList.Count>=ACount;
+  TMonitor.Exit(FLock);
+end;
+
 procedure TKRThreadQueue.Clear;
 begin
-  LockQueue;
-  List.Clear;
-  UnlockQueue;
+  TMonitor.Enter(FLock);
+  FList.Clear;
+  TMonitor.Exit(FLock);
+end;
+
+function TKRThreadQueue.Count: Integer;
+begin
+  TMonitor.Enter(FLock);
+  Result:=FList.Count;
+  TMonitor.Exit(FLock);
 end;
 
 constructor TKRThreadQueue.Create;
 begin
-  inherited;
+  inherited Create;
   FLock:=TObject.Create;
+  FList:=TList.Create;
 end;
 
 destructor TKRThreadQueue.Destroy;
 begin
-  LockQueue;
-  inherited Destroy;
-  UnlockQueue;
+  FList.Free;
   FLock.Free;
+  inherited;
 end;
 
 procedure TKRThreadQueue.LockQueue;
@@ -61,25 +81,26 @@ begin
   TMonitor.Enter(FLock);
 end;
 
-function TKRThreadQueue.PeekItem: Pointer;
+function TKRThreadQueue.Peek: Pointer;
 begin
-  LockQueue;
-  Result:=inherited PeekItem;
-  UnlockQueue;
+  TMonitor.Enter(FLock);
+  Result := FList[FList.Count-1];
+  TMonitor.Exit(FLock);
 end;
 
-function TKRThreadQueue.PopItem: Pointer;
+function TKRThreadQueue.Pop: Pointer;
 begin
-  LockQueue;
-  Result:=inherited PopItem;
-  UnlockQueue;
+  TMonitor.Enter(FLock);
+  Result := FList[FList.Count-1];
+  FList.Delete(FList.Count-1);
+  TMonitor.Exit(FLock);
 end;
 
-procedure TKRThreadQueue.PushItem(AItem: Pointer);
+procedure TKRThreadQueue.Push(AItem: Pointer);
 begin
-  LockQueue;
-  List.Insert(0, AItem);
-  UnlockQueue;
+  TMonitor.Enter(FLock);
+  FList.Insert(0, AItem);
+  TMonitor.Exit(FLock);
 end;
 
 procedure TKRThreadQueue.UnlockQueue;

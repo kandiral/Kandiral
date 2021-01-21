@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRCOMPortSets                                                             *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 31.08.2017                                                          *)
 (*  https://kandiral.ru/delphi/krcomportsets.pas.html                         *)
 (*                                                                            *)
 (******************************************************************************)
@@ -20,7 +20,7 @@ uses
     Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
     Dialogs, StdCtrls, ExtCtrls,
   {$IFEND}
-  KRComboBox, KRCOMPort, KRIniConfig, SetupAPI;
+  KRCOMPortSetsLng, KRComboBox, KRCOMPort, KRIniConfig, SetupAPI;
 
 const
   GUID_DEVICEINTERFACE_COMPORT:TGUID=(
@@ -148,21 +148,7 @@ begin
           if(RegQueryValueEx(hDeviceKey,'PortName',nil,@dwType,@szData,@dwSize)=0)and(dwSize>=2)then s:=szData;
           RegCloseKey(hDeviceKey);
         end;
-        if(s<>'')then begin
-          {szData[0]:=#0;
-          dwSize:=sizeof(szData);
-          dwType:=0;
-          if(SetupDiGetDeviceRegistryPropertyW(
-              h,
-              devinfo,
-              SPDRP_DEVICEDESC,
-              dwType,
-              @szData,
-              dwSize,
-              dwSize))and(dwType = REG_SZ)then
-                item.DevDesc:=szData; }
-          AList.Add(s);
-        end;
+        if(s<>'')then AList.Add(s);
       end;
       inc(nIndex);
     end;
@@ -392,6 +378,7 @@ var
 begin
   inherited;
   Position:=poScreenCenter;
+  Caption:=COMPORTSETS_FORMCAPTION;
 
   cbPort:=TKRBLComboBox.Create(Self);
   cbPort.Parent:=Self;
@@ -404,7 +391,7 @@ begin
   cbPort.BLabel.Height:=13;
   cbPort.BLabel.AutoSize:=True;
   cbPort.BLabel.Spacing:=6;
-  cbPort.BLabel.Caption := #1055#1086#1088#1090;
+  cbPort.BLabel.Caption:=COMPORTSETS_PORT;
   cbPort.Items.BeginUpdate;
   for i := 1 to 30 do
     cbPort.Items.Add('COM'+IntToStr(i));
@@ -421,7 +408,7 @@ begin
   cbBaudRate.BLabel.Height:=13;
   cbBaudRate.BLabel.AutoSize:=True;
   cbBaudRate.BLabel.Spacing:=6;
-  cbBaudRate.BLabel.Caption:=#1057#1082#1086#1088#1086#1089#1090#1100;
+  cbBaudRate.BLabel.Caption:=COMPORTSETS_BAUDRATE;
   cbBaudRate.Items.Add('110');
   cbBaudRate.Items.Add('300');
   cbBaudRate.Items.Add('600');
@@ -449,7 +436,7 @@ begin
   cbDataBits.BLabel.Height:=13;
   cbDataBits.BLabel.AutoSize:=True;
   cbDataBits.BLabel.Spacing:=6;
-  cbDataBits.BLabel.Caption:=#1041#1080#1090#1099' '#1076#1072#1085#1085#1099#1093;
+  cbDataBits.BLabel.Caption:=COMPORTSETS_DATABITS;
   cbDataBits.Items.Add('5');
   cbDataBits.Items.Add('6');
   cbDataBits.Items.Add('7');
@@ -466,7 +453,7 @@ begin
   cbStopBits.BLabel.Height:=13;
   cbStopBits.BLabel.AutoSize:=True;
   cbStopBits.BLabel.Spacing:=6;
-  cbStopBits.BLabel.Caption:=#1057#1090#1086#1087' '#1073#1080#1090#1099;
+  cbStopBits.BLabel.Caption:=COMPORTSETS_STOPBITS;
   cbStopBits.Items.Add('1');
   cbStopBits.Items.Add('1.5');
   cbStopBits.Items.Add('2');
@@ -482,12 +469,12 @@ begin
   cbParity.BLabel.Height:=13;
   cbParity.BLabel.AutoSize:=True;
   cbParity.BLabel.Spacing:=6;
-  cbParity.BLabel.Caption:=#1063#1077#1090#1085#1086#1089#1090#1100;
-  cbParity.Items.Add(#1053#1077#1090);
-  cbParity.Items.Add(#1063#1077#1090);
-  cbParity.Items.Add(#1053#1077#1095#1077#1090);
-  cbParity.Items.Add(#1052#1072#1088#1082#1077#1088);
-  cbParity.Items.Add(#1055#1088#1086#1073#1077#1083);
+  cbParity.BLabel.Caption:=COMPORTSETS_PARITY;
+  cbParity.Items.Add(COMPORTSETS_PARITY_NO);
+  cbParity.Items.Add(COMPORTSETS_PARITY_ODD);
+  cbParity.Items.Add(COMPORTSETS_PARITY_EVEN);
+  cbParity.Items.Add(COMPORTSETS_PARITY_MARK);
+  cbParity.Items.Add(COMPORTSETS_PARITY_SPACE);
 
   cbFlowControl:=TKRBLComboBox.Create(Self);
   cbFlowControl.Parent:=self;
@@ -500,12 +487,13 @@ begin
   cbFlowControl.BLabel.Height:=13;
   cbFlowControl.BLabel.AutoSize:=True;
   cbFlowControl.BLabel.Spacing:=6;
-  cbFlowControl.BLabel.Caption:=#1059#1087#1088#1072#1074#1083#1077#1085#1080#1077' '#1087#1086#1090#1086#1082#1086#1084;
-  cbFlowControl.Items.Add(#1053#1077#1090);
-  cbFlowControl.Items.Add(#1040#1087#1087#1072#1088#1072#1090#1085#1086#1077);
-  cbFlowControl.Items.Add(#1055#1088#1080#1082#1083#1072#1076#1085#1086#1077);
-  cbFlowControl.Items.Add(#1057#1090#1072#1085#1076#1072#1088#1090#1085#1086#1077);
+  cbFlowControl.BLabel.Caption:=COMPORTSETS_FLOWCONTROL;
+  cbFlowControl.Items.Add(COMPORTSETS_FLOWCONTROL_NO);
+  cbFlowControl.Items.Add(COMPORTSETS_FLOWCONTROL_HARDWARE);
+  cbFlowControl.Items.Add(COMPORTSETS_FLOWCONTROL_SOFTWARE);
+  cbFlowControl.Items.Add(COMPORTSETS_FLOWCONTROL_CUSTOM);
 
+  Button2.Caption:=COMPORTSETS_BUTTONCANCEL;
 end;
 
 function TKRCOMPortSetsForm.Execute(ACOMPort: IKRCOMPortSets; AAutoDetectPorts: boolean): boolean;

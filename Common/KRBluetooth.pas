@@ -4,21 +4,26 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRBluetooth                                                               *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 28.01.2020                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
-unit KRBluetooth;
+unit KRBluetooth; // CompilerVersion>=28
 
 interface
 
 uses
   {$IF CompilerVersion >= 23}
-    Winapi.Windows, System.Classes, System.SysUtils,
+    Winapi.Windows, {$IF CompilerVersion >= 28}Winapi.Bluetooth, {$IFEND}System.Classes, System.SysUtils
   {$ELSE}
-    Windows, Classes, SysUtils,
+    Windows, Classes, SysUtils
   {$IFEND}
-    JwaBluetoothAPIs;
+
+{$IF CompilerVersion <= 27}
+  , JwaBluetoothAPIs
+{$IFEND}
+;
+
 
 type
   TKRBTSearch = set of (krbtsAuthenticated, krbtsRemembered, krbtsUnknown, krbtsConnected);
@@ -87,6 +92,7 @@ type
     property LocalDevicesCount: integer read GetLocalDevicesCount;
   end;
 
+
 implementation
 
 { TKRBluetooth }
@@ -133,7 +139,11 @@ var
 begin
   FreeLocalDevicesList;
   BFRP.dwSize := SizeOf(BFRP);
+  {$IF CompilerVersion >= 28}
+  hFind := BluetoothFindFirstRadio(BFRP, hRadio);
+  {$ELSE}
   hFind := BluetoothFindFirstRadio(@BFRP, hRadio);
+  {$IFEND}
   if (hFind <> 0) then begin
     repeat
       FillChar(RadioInfo, 0, SizeOf(BLUETOOTH_RADIO_INFO));

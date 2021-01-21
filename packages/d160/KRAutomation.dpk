@@ -73,6 +73,12 @@ contains
   KRVButton in '..\..\Automation\KRVButton.pas',
   KRVCheckBox in '..\..\Automation\KRVCheckBox.pas',
   KRVCheckGroupBox in '..\..\Automation\KRVCheckGroupBox.pas',
-  KRVComboBox in '..\..\Automation\KRVComboBox.pas';
+  KRVComboBox in '..\..\Automation\KRVComboBox.pas',
+  KRCOMPortSetsLng in '..\..\Automation\KRCOMPortSetsLng.pas',
+  KRConnectorLng in '..\..\Automation\KRConnectorLng.pas',
+  KRFieldLng in '..\..\Automation\KRFieldLng.pas',
+  KRModbusClientLng in '..\..\Automation\KRModbusClientLng.pas',
+  KRModbusLng in '..\..\Automation\KRModbusLng.pas',
+  KRModbusMasterLng in '..\..\Automation\KRModbusMasterLng.pas';
 
 end.

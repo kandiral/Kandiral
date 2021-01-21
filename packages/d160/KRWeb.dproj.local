@@ -1,9 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <BorlandProject>
 	<Transactions>
-    <Transaction>1899.12.30 00:00:00.000.322,=rtl.dcp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.777,=rtl.dcp</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.524,=designide.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.322,=rtl.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.567,=inet.dcp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.725,C:\Users\kandiral\Documents\RAD Studio\Projects\Package1.dproj=X:\Components\Kandiral\packages\d160\KRWeb.dproj</Transaction>
     <Transaction>1899.12.30 00:00:00.000.825,=X:\Components\Kandiral\packages\d160\KRWebRegister.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.290,=X:\Components\Kandiral\Web\KRGoogleSearchConsole.pas</Transaction>
@@ -12,7 +12,7 @@
     <Transaction>1899.12.30 00:00:00.000.183,=X:\Components\Kandiral\Web\KRGoogleSheets.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.588,=KRAutomation.dcp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.124,=X:\Components\Kandiral\Web\KRGoogleAuth.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.567,=inet.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.524,=designide.dcp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.622,=KRCommon.dcp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.484,=vclie.dcp</Transaction>
   </Transactions>

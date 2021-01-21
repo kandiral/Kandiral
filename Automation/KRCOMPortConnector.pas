@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRCOMPortConnector                                                        *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 17.03.2020                                                          *)
 (*  https://kandiral.ru/delphi/krcomportconnector.pas.html                    *)
 (*                                                                            *)
 (******************************************************************************)
@@ -18,26 +18,32 @@ uses
   {$ELSE}
     Windows, Classes, SysUtils, Forms,
   {$IFEND}
-  KRThreadQueue, KRCOMPort, KRConnector, KRComPortSets;
+  KRCOMPort, KRConnector, KRConnectorLng, KRComPortSets, KRTypes;
 
 type
   TKRCOMPortConnector = class;
 
   TKRCOMPortThread = class(TKRConnectorThread)
   private
-    FErrCntr,FErrCntr2: integer;
+    FErrCntr: integer;
     FComPort: TKRCOMPort;
+    FOverlapped: TOverlapped;
+    tm: cardinal;
   protected
     procedure _exec; override;
-    procedure KRExecutePausedFirst; override;
+    procedure KRExecuteLast; override;
   public
-    constructor CreateTh(AConnector: TKRConnector; AComPort: TKRCOMPort; AQueue: TKRThreadQueue;
-      AQueueOut: TKRThreadQueue);
+    constructor CreateTh(AConnector: TKRConnector; AComPort: TKRCOMPort);
   end;
 
   TKRCOMPortConnector = class(TKRConnector, IKRCOMPortSets)
   private
     FComPort: TKRCOMPort;
+    FReadTotalTimeoutMultiplier: Cardinal;
+    FReadTotalTimeoutConstant: Cardinal;
+    FWriteTotalTimeoutMultiplier: Cardinal;
+    FWriteTotalTimeoutConstant: Cardinal;
+    FReadIntervalTimeout: Cardinal;
     function GetBaudRate: integer;
     function GetDataBits: integer;
     function GetFlowControl: TKRFlowControl;
@@ -52,6 +58,7 @@ type
     procedure SetStopBits(const Value: Integer);
   protected
     function GetConnected: boolean;override;
+    procedure CreateThread; override;
   public
     constructor Create(AOwner: TComponent);override;
     destructor Destroy;override;
@@ -62,36 +69,44 @@ type
     property BaudRate: integer read GetBaudRate write SetBaudRate;
     property DataBits: integer read GetDataBits write SetDataBits;
     property FlowControl: TKRFlowControl read GetFlowControl write SetFlowControl;
+
+    property ReadTotalTimeoutMultiplier: Cardinal read FReadTotalTimeoutMultiplier
+      write FReadTotalTimeoutMultiplier default 5;
+    property ReadIntervalTimeout: Cardinal read FReadIntervalTimeout
+      write FReadIntervalTimeout default 1;
+    property ReadTotalTimeoutConstant: Cardinal read FReadTotalTimeoutConstant
+      write FReadTotalTimeoutConstant default 15;
+    property WriteTotalTimeoutMultiplier: Cardinal read FWriteTotalTimeoutMultiplier
+      write FWriteTotalTimeoutMultiplier default 2;
+    property WriteTotalTimeoutConstant: Cardinal read FWriteTotalTimeoutConstant
+      write FWriteTotalTimeoutConstant default 1;
   end;
 
 implementation
 
-uses Funcs, Math;
-
 { TKRCOMPortThread }
 
 constructor TKRCOMPortThread.CreateTh(AConnector: TKRConnector;
-  AComPort: TKRCOMPort; AQueue, AQueueOut: TKRThreadQueue);
+  AComPort: TKRCOMPort);
 begin
-  FWaitRespTime:=35;
-  FErrCntr:=0;
-  FErrCntr2:=0;
   FComPort:=AComPort;
-  inherited CreateTh(AConnector, AQueue, AQueueOut);
+  FOverlapped.hEvent := CreateEvent(nil, True, True, nil);
+  inherited CreateTh(AConnector);
 end;
 
-procedure TKRCOMPortThread.KRExecutePausedFirst;
+procedure TKRCOMPortThread.KRExecuteLast;
 begin
   try
-    if FComPort.Connected then FComPort.Close;
+    FComPort.Close;
   except end;
+  CloseHandle(FOverlapped.hEvent);
   inherited;
 end;
 
 procedure TKRCOMPortThread._exec;
 var
-  n,l: integer;
-  tm,tm0: Cardinal;
+  n, rlen: Cardinal;
+  Signaled: DWORD;
 
   procedure _error(AErr: TKRConnectorError);
   begin
@@ -105,25 +120,16 @@ var
     end;
   end;
 
-  procedure _error2(AErr: TKRConnectorError);
-  begin
-    inc(FErrCntr2);
-    FPk^.Error:=AErr;
-    FPk^.Length:=0;
-    if(FErrCntr2>=7)then begin
-      FComPort.Close;
-      FLastConnectTime:=getTickCount;
-      FErrCntr2:=0;
-    end;
-  end;
-
 begin
   if not FComPort.Connected then begin
     if((getTickCount-FLastConnectTime)>FReconnectTime)then begin
       try
+        FComPort.ReadTotalTimeoutMultiplier := TKRCOMPortConnector(FConnector).FReadTotalTimeoutMultiplier;
+        FComPort.ReadIntervalTimeout := TKRCOMPortConnector(FConnector).FReadIntervalTimeout;
+        FComPort.ReadTotalTimeoutConstant := TKRCOMPortConnector(FConnector).FReadTotalTimeoutConstant;
+        FComPort.WriteTotalTimeoutMultiplier := TKRCOMPortConnector(FConnector).FWriteTotalTimeoutMultiplier;
+        FComPort.WriteTotalTimeoutConstant := TKRCOMPortConnector(FConnector).FWriteTotalTimeoutConstant;
         SetStat(cstConnecting);
-        FComPort.WriteTotalTimeoutConstant:=FWriteTimeout;
-        FComPort.WriteTotalTimeoutMultiplier:=Max(FWriteTimeout div 10,10);
         FComPort.Open;
       except on E: Exception do
         FConnector.DoRuntimeError('TKRCOMPortThread[FConnector.Name="'+
@@ -131,71 +137,75 @@ begin
       end;
       FLastConnectTime:=getTickCount;
     end;
-    if not FComPort.Connected then begin
+    if FComPort.Connected then begin
+      SetStat(cstConnected);
+      tm:=getTickCount;
+    end else begin
       SetStat(cstWaitReconnecting);
       FPk^.Error:=ceNotConnection;
       FPk^.Length:=0;
       DoCallBack;
       exit;
-    end else SetStat(cstConnected);
+    end;
     FErrCntr:=0;
   end;
 
-  tm:=0;
   FPk^.Error:=ceOK;
+
+  if FInterval>0 then begin
+    tm:=getTickCount-tm;
+    if tm<FInterval then sleep(FInterval-tm);
+  end;
 
   try
     SendPack;
-    tm:=getTickCount;
-    n:=FComPort.Write(FPk^.Pack^,FPk^.Length);
-    if n<>FPk^.Length then _error2(ceDataNotSended);
+
+    FOverlapped.Internal:=0;
+    FOverlapped.InternalHigh:=0;
+    FOverlapped.Offset:=0;
+    FOverlapped.OffsetHigh:=0;
+    ResetEvent(FOverlapped.hEvent);
+    if not(WriteFile(FComPort.Handle, FPk^.Pack^, FPk^.Length, n, @FOverlapped) or
+        (GetLastError = ERROR_IO_PENDING))then _error(ceDataNotSended) else begin
+      Signaled := WaitForSingleObject(FOverlapped.hEvent, INFINITE);
+      if not((Signaled = WAIT_OBJECT_0) and
+        (GetOverlappedResult(FComPort.Handle, FOverlapped, n, False))) then _error(ceDataNotSended);
+    end;
+
   except on E: Exception do begin
        FConnector.DoRuntimeError('TKRCOMPortThread[FConnector.Name="'+
          FConnector.Name+'"; procedure _exec; n:=FComPort.Write(FPk^.Pack^,FPk^.Length);',E);
-      _error2(ceDataNotSended);
+      _error(ceDataNotSended);
     end;
   end;
 
   if FPk^.Error<>ceOK then begin
+    tm:=getTickCount;
     DoCallBack;
     exit;
   end;
 
   if FPk^.WaitResult then try
-    n:=0;
-    if(FPk^.RLen>0)then begin
-      l:=(FPk.RLen div 2)*3;
-      if l>255 then l:=255;
-    end else l:=255;
 
-    tm0:=getTickCount+FWaitRespTime;
-    while(getTickCount-tm<FWriteTimeout+FReadTimeout)do begin
-      if FCOMPort.InputCount>0 then begin
-        n:=n+FComPort.Read(Pointer(Integer(FPk^.Pack)+n)^,l-n);
-        if(FPk^.RLen>0)and(n>=FPk^.RLen)then break;
-        if FPk^.DelimiterLen>0 then begin
-          case FPk^.DelimiterLen of
-            1: if FPk^.Pack^[n-1]=FPK^.Delimiter then break;
-            2: if (Word(FPk^.Pack^[n-2]) shr 8) + FPk^.Pack^[n-1]=FPK^.Delimiter then break;
-            3: if (Cardinal(FPk^.Pack^[n-3]) shr 16) + (Word(FPk^.Pack^[n-2]) shr 8) + FPk^.Pack^[n-1]=FPK^.Delimiter then break;
-            4: if (Cardinal(FPk^.Pack^[n-4]) shr 24) + (Cardinal(FPk^.Pack^[n-3]) shr 16) + (Word(FPk^.Pack^[n-2]) shr 8) + FPk^.Pack^[n-1]=FPK^.Delimiter then break;
-          end;
-        end;
-        tm0:=getTickCount+FWaitRespTime;
-        continue;
-      end;
-      if tm0<getTickCount then break;
-    end;
+    FOverlapped.Internal:=0;
+    FOverlapped.InternalHigh:=0;
+    FOverlapped.Offset:=0;
+    FOverlapped.OffsetHigh:=0;
+    ResetEvent(FOverlapped.hEvent);
 
-    if n>0 then begin
-      Inc(FCounter);
-      FPk^.Length:=n;
-      FErrCntr:=0;
-      RecvPack;
-    end else
-      if(getTickCount-tm>FWriteTimeout+FReadTimeout)then
-        _error(ceResponseTimeout)
-      else _error(ceNoResponse);
+    if FPk^.RLen>0 then rlen:=FPk^.RLen else rlen:=SizeOf(TKRBuffer);
+
+    if(ReadFile(FComPort.Handle, FPk^.Pack^, rlen, n, @FOverlapped)and
+        (GetLastError<>ERROR_IO_PENDING))then begin
+
+      if n>0 then begin
+        Inc(FCounter);
+        FPk^.Length:=n;
+        FErrCntr:=0;
+        RecvPack;
+      end else _error(ceNoResponse);
+
+    end else _error(ceResponseTimeout);
 
   except on E: Exception do begin
        FConnector.DoRuntimeError('TKRCOMPortThread[FConnector.Name="'+
@@ -204,8 +214,8 @@ begin
     end;
   end;
 
+  tm:=getTickCount;
   DoCallBack;
-
 end;
 
 { TKRCOMPortConnector }
@@ -215,21 +225,23 @@ begin
   inherited;
   FConnectorType:=ctCOMPort;
   FComPort:=TKRCOMPort.Create;
-  FThread:=TKRCOMPortThread.CreateTh(Self,FComPort,FQueue,FQueueOut);
+  FReadTotalTimeoutMultiplier := 5;
+  FReadIntervalTimeout := 1;
+  FReadTotalTimeoutConstant := 15;
+  FWriteTotalTimeoutMultiplier := 2;
+  FWriteTotalTimeoutConstant := 1;
+end;
+
+procedure TKRCOMPortConnector.CreateThread;
+begin
+  FThread:=TKRCOMPortThread.CreateTh(Self,FComPort);
+  inherited;
 end;
 
 destructor TKRCOMPortConnector.Destroy;
 begin
-  FThread.Terminate;
-  while FThread.Working do Application.ProcessMessages;
-  FThread.Free;
-  if FComPort.Connected then begin
-    try
-      FComPort.Close;
-    finally
-      FComPort.Free;
-    end;
-  end;
+  Active:=false;
+  FComPort.Free;
   inherited;
 end;
 

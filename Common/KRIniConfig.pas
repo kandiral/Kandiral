@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRIniConfig                                                               *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 16.09.2019                                                          *)
 (*  https://kandiral.ru/delphi/kriniconfig.pas.html                           *)
 (*                                                                            *)
 (******************************************************************************)
@@ -19,7 +19,8 @@ uses
   {$ELSE}
     SysUtils, Classes, Variants, IniFiles, Forms, StrUtils,
   {$IFEND}
-    KRComponentCollection, KRRuntimeErrors;
+    KRComponentCollection, KRRuntimeErrors, KRVariants, KRWindows, KRCryptCommon,
+    KRBase64, KRBCrypt;
 
 type
 
@@ -55,6 +56,7 @@ type
     FDefBool: boolean;
     FDefDWORD: Cardinal;
     FEncrypt: boolean;
+    FChange: TNotifyEvent;
     procedure SetSection(const Value: String);
     procedure SetValue(const Value: Variant);
     procedure SetValueType(const Value: TKRIniCfgValType);
@@ -62,7 +64,8 @@ type
     procedure SetDefaultValue(const Value: String);
     function GetDefaultValue: String;
     procedure SetEncrypt(const Value: boolean);
-    function GetName: TComponentName;
+  protected
+    procedure DoChange;
   public
     constructor Create(AOwner: TComponent);override;
     destructor Destroy;override;
@@ -73,10 +76,11 @@ type
     property Value: Variant read GetValue write SetValue;
   published
     property Section: String read FSection write SetSection;
-    property Name: TComponentName read GetName write SetName stored False;
     property ValueType: TKRIniCfgValType read FValueType write SetValueType default icvtString;
     property DefaultValue: String read GetDefaultValue write SetDefaultValue;
     property Encrypt: boolean read FEncrypt write SetEncrypt;
+    property Name;
+    property OnChange: TNotifyEvent read FChange write FChange;
   end;
 
   TKRIniConfig = class(TKRComponentCollection)
@@ -90,9 +94,13 @@ type
     FAppDataPathS: String;
     FRuntimeErrorEv: TKRRuntimeErrorEv;
     FPassword: String;
+    FPassHash: TBytes;
     procedure SetFileName(const Value: TFileName);
     procedure SetApplicationPath(const Value: boolean);
     procedure SetAppDataPath(const Value: boolean);
+    function EncryptStr(AString: String): String;
+    function DecryptStr(AString: String): String;
+    procedure SetPassword(const Value: String);
   protected
     procedure AftAddItem(var AItem: TKRComponentCollectionItem);override;
   public
@@ -112,15 +120,13 @@ type
     property FileName: TFileName read FFileName write SetFileName;
     property ApplicationPath: boolean read FApplicationPath write SetApplicationPath default true;
     property AppDataPath: boolean read FAppDataPath write SetAppDataPath default false;
-    property Password: String read FPassword write FPassword;
+    property Password: String read FPassword write SetPassword;
     property OnBkSave: TKRCfgBackupEv read FBkSave write FBkSave;
     property OnBkLoad: TKRCfgBackupEv read FBkLoad write FBkLoad;
     property OnRuntimeError: TKRRuntimeErrorEv read FRuntimeErrorEv write FRuntimeErrorEv;
   end;
 
 implementation
-
-uses lgop, Funcs, KRWindows;
 
 { TKRIniConfig }
 
@@ -156,10 +162,77 @@ begin
   FApplicationPath:=true;
 end;
 
+function TKRIniConfig.DecryptStr(AString: String): String;
+var
+  smFrom, smTo: TMemoryStream;
+  s: AnsiString;
+  n,i: integer;
+  buf: TBytes;
+begin
+  if (Length(FPassHash)=0) or (AString='') then begin
+    Result:=AString;
+    exit;
+  end;
+
+  s:=AnsiString(AString);
+  smFrom:=TMemoryStream.Create;
+  smTo:=TMemoryStream.Create;
+  try
+    SetLength(buf,(Length(s) shr 2) * 3);
+    n:=KRBase64Decode(@s[1],@buf[0],Length(s),@KRBASE64_DEFAULT_DECODE_TABLE,KRBASE64_DEFAULT_SUFFIX);
+    smFrom.Write((@buf[0])^,n);
+    KRBCrypt_RC4_Decrypt(smFrom,smTo,FPassHash);
+    SetLength(buf,smTo.Size);
+    smTo.Position:=0;
+    smTo.Read((@buf[0])^,smTo.Size);
+    Result:='';
+    n:=(smTo.Size shr 1)-1;
+    for i := 0 to n do
+      Result:=Result+Char((word(buf[i+i])shl 8)or buf[i+i+1]);
+  finally
+    smFrom.Free;
+    smTo.Free;
+  end;
+end;
+
 destructor TKRIniConfig.Destroy;
 begin
   if Assigned(FIniFile) then FIniFile.Free;
   inherited;
+end;
+
+function TKRIniConfig.EncryptStr(AString: String): String;
+var
+  smFrom, smTo: TMemoryStream;
+  n, i: integer;
+  buf: TBytes;
+  s: AnsiString;
+begin
+  if (Length(FPassHash)=0) or (AString='') then begin
+    Result:=AString;
+    exit;
+  end;
+
+  smFrom:=TMemoryStream.Create;
+  smTo:=TMemoryStream.Create;
+  try
+    n:=Length(AString);
+    SetLength(buf,n shl 1);
+    for i := 1 to n do begin
+      buf[i+i-2]:=Ord(AString[i])shr 8;
+      buf[i+i-1]:=Ord(AString[i]);
+    end;
+    smFrom.Write((@buf[0])^,n shl 1);
+    KRBCrypt_RC4_Encrypt(smFrom,smTo,FPassHash);
+    SetLength(buf,smTo.Size);
+    smTo.Position:=0;
+    smTo.Read((@buf[0])^,smTo.Size);
+    KRBase64EncodeBytes(@buf[0],smTo.Size,s,@KRBASE64_DEFAULT_CHAR_TABLE,KRBASE64_DEFAULT_SUFFIX);
+    Result:=String(s);
+  finally
+    smFrom.Free;
+    smTo.Free;
+  end;
 end;
 
 function TKRIniConfig.GetParamByName(AName: String; ACaseSensitive: boolean = false): TKRIniCfgParam;
@@ -196,7 +269,7 @@ begin
         icvtInteger: prm.Value:=_iniFl.ReadInteger(prm.FSection,prm.Name,prm.Value);
         icvtFloat: prm.Value:=_iniFl.ReadFloat(prm.FSection,prm.Name,prm.Value);
         icvtBool: prm.Value:=_iniFl.ReadBool(prm.FSection,prm.Name,prm.Value);
-        icvtDWORD: prm.Value:=StrToDWordDef(_iniFl.ReadString(prm.FSection,prm.Name,DWordToStr(prm.Value)),prm.Value);
+        icvtDWORD: prm.Value:=StrToIntDef(_iniFl.ReadString(prm.FSection,prm.Name,IntToStr(prm.Value)),prm.Value);
       end;
       TKRIniCfgParam(Items[i]).FValue:=null;
     end;
@@ -225,7 +298,7 @@ begin
         icvtInteger: _iniFl.WriteInteger(prm.FSection,prm.Name,prm.Value);
         icvtFloat: _iniFl.WriteFloat(prm.FSection,prm.Name,prm.Value);
         icvtBool: _iniFl.WriteBool(prm.FSection,prm.Name,prm.Value);
-        icvtDWORD: _iniFl.WriteString(prm.FSection,prm.Name,DWordToStr(prm.Value));
+        icvtDWORD: _iniFl.WriteString(prm.FSection,prm.Name,IntToStr(prm.Value));
       end;
       TKRIniCfgParam(Items[i]).FValue:=null;
     end;
@@ -299,6 +372,27 @@ begin
       elem.Ok;
 end;
 
+procedure TKRIniConfig.SetPassword(const Value: String);
+var
+  ms: TMemorySTream;
+  n: integer;
+  buf: TBytes;
+  hash: TKRSHA1Hash;
+begin
+  FPassword := Value;
+  ms:=TMemorySTream.Create;
+  try
+    n:=Length(FPassword)shl 1;
+    SetLength(buf,n);
+    ms.Write((@buf[0])^,n);
+    KRBCrypt_SHA1(ms,hash);
+    SetLength(FPassHash,20);
+    Move((@hash.bytes[0])^,(@FPassHash[0])^,20);
+  finally
+    ms.Free;
+  end;
+end;
+
 { TKRIniCfgParam }
 
 procedure TKRIniCfgParam.AddMon(AMon: IKRCfgParam);
@@ -333,6 +427,16 @@ begin
   inherited;
 end;
 
+procedure TKRIniCfgParam.DoChange;
+var
+  i: integer;
+begin
+  if FList.Count>0 then
+    for i := 0 to FList.Count-1 do
+      IKRCfgParam(FList.Items[i]).CfgParamChange(Self);
+  if Assigned(FChange) then FChange(Self);
+end;
+
 function TKRIniCfgParam.GetDefaultValue: String;
 begin
   Result:='';
@@ -341,39 +445,36 @@ begin
     icvtInteger: Result:=IntToStr(FDefInt);
     icvtFloat: Result:=FloatToStr(FDefFlt);
     icvtBool: Result:=BoolToStr(FDefBool,true);
-    icvtDWORD: Result:=DWordTOStr(FDefDWORD);
+    icvtDWORD: Result:=IntToStr(FDefDWORD);
   end;
-end;
-
-function TKRIniCfgParam.GetName: TComponentName;
-begin
-  Result:=inherited Name;
 end;
 
 function TKRIniCfgParam.GetValue: Variant;
 begin
   if(FValue=null)and(Assigned(FIniConfig))and(Assigned(FIniConfig.FIniFile))then begin
     case FValueType of
-      icvtString: FValue:=FIniConfig.FIniFile.ReadString(FSection,Name,
-        _is(FEncrypt,CryptString(FDefStr,AnsiString(FIniConfig.FPassword),true),FDefStr));
+      icvtString:
+        if FEncrypt then
+            FValue:=FIniConfig.DecryptStr(FIniConfig.FIniFile.ReadString(FSection,Name,FIniConfig.EncryptStr(FDefStr)))
+        else
+            FValue:=FIniConfig.FIniFile.ReadString(FSection,Name,FDefStr);
       icvtInteger: FValue:=FIniConfig.FIniFile.ReadInteger(FSection,Name,FDefInt);
       icvtFloat: FValue:=FIniConfig.FIniFile.ReadFloat(FSection,Name,FDefFlt);
       icvtBool: FValue:=FIniConfig.FIniFile.ReadBool(FSection,Name,FDefBool);
-      icvtDWord: FValue:=StrToDWordDef(FIniConfig.FIniFile.ReadString(FSection,Name,DWordToStr(FDefDWORD)),FDefDWORD);
+      icvtDWord: FValue:=StrToIntDef(FIniConfig.FIniFile.ReadString(FSection,Name,IntToStr(FDefDWORD)),FDefDWORD);
     end;
   end;
-  if(FValueType=icvtString)and FEncrypt then Result:=CryptString(FValue,AnsiString(FIniConfig.FPassword),false)
-  else Result:=FValue;
+  Result:=FValue;
 end;
 
 procedure TKRIniCfgParam.SetDefaultValue(const Value: String);
 var
   n,e: integer;
+  i64: int64;
   s: String;
   ex: extended;
   _fs: TFormatSettings;
   b: boolean;
-  dw: Cardinal;
 begin
   s:=Trim(Value);
   case FValueType of
@@ -395,14 +496,13 @@ begin
       if TryStrToBool(S, b) then FDefBool:=b;
     end;
     icvtDWORD: begin
-      if StrToDWORD(s,dw) then FDefDWORD:=dw;
+      Val(s,i64,e);
+      if e=0 then FDefDWORD:=i64;
     end;
   end;
 end;
 
 procedure TKRIniCfgParam.SetEncrypt(const Value: boolean);
-var
-  s: String;
 begin
   if FEncrypt<>Value then begin
     FEncrypt:=Value;
@@ -419,19 +519,17 @@ begin
 end;
 
 procedure TKRIniCfgParam.SetValue(const Value: Variant);
-var
-  i: integer;
 begin
-  //try
   if(Assigned(FIniConfig))and(Assigned(FIniConfig.FIniFile))then begin
     if(FValue=null)then GetValue;
-    if(not VarSameValue(FValue,Value)) then begin
+    if(not KRVarIsEqually(FValue,Value)) then begin
       case FValueType of
         icvtString: if VarIsStr(Value) then begin
+          FValue := Value;
           if FEncrypt then
-            FValue := CryptString(Value,AnsiString(FIniConfig.FPassword),true)
-          else FValue := Value;
-          FIniConfig.FIniFile.WriteString(FSection,Name,FValue);
+            FIniConfig.FIniFile.WriteString(FSection,Name,FIniConfig.EncryptStr(FValue))
+          else
+            FIniConfig.FIniFile.WriteString(FSection,Name,FValue);
         end;
         icvtInteger: if(FindVarData(Value)^.VType in [varSmallInt, varInteger, varShortInt, varByte, varWord, varLongWord, varInt64])then begin
           FValue := Value;
@@ -447,24 +545,12 @@ begin
         end;
         icvtDWORD: if(FindVarData(Value)^.VType in [varSmallInt, varInteger, varShortInt, varByte, varWord, varLongWord])then begin
           FValue := Value;
-          FIniConfig.FIniFile.WriteString(FSection,Name,DWordToStr(FValue));
+          FIniConfig.FIniFile.WriteString(FSection,Name,IntToStr(FValue));
         end;
       end;
-      if FList.Count>0 then
-        for i := 0 to FList.Count-1 do
-          IKRCfgParam(FList.Items[i]).CfgParamChange(Self);
+      DoChange;
     end;
   end;
-  {except on E: Exception do begin
-    if Assigned(FIniConfig)then
-      REEvent(
-        FIniConfig.FRuntimeErrorEv,
-        FIniConfig,
-        'TKRIniCfgParam Name='+Name+'; Value: VType='+IntToStr(FindVarData(Value)^.VType)+
-        'FValue: VType='+IntToStr(FindVarData(FValue)^.VType)
-      ,E);
-  end;
-  end; }
 end;
 
 procedure TKRIniCfgParam.SetValueType(const Value: TKRIniCfgValType);

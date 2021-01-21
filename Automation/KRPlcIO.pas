@@ -14,11 +14,11 @@ interface
 
 uses
   {$IF CompilerVersion >= 23}
-    System.Classes,
+    System.Classes, System.SysUtils, Vcl.Forms,
   {$ELSE}
-    Classes,
+    Classes, SysUtils, Forms,
   {$IFEND}
-  KRThread;
+  KRWindows, KRThread, KRStrUtils;
 
 type
   TKRPLCIOERROR = record
@@ -106,8 +106,6 @@ type
   end;
 
 implementation
-
-uses KRWindows, Funcs, SysUtils, Forms;
 
 { TKRPLCIO }
 
@@ -221,7 +219,7 @@ begin
       end;
     end;
   end;
-  if FLError<>'' then FLError:='['+DWordToStr(FThread.FErrorLevel)+'] '+FLError+' {'+FThread.FStdErr+'}';
+  if FLError<>'' then FLError:='['+IntToStr(FThread.FErrorLevel)+'] '+FLError+' {'+FThread.FStdErr+'}';
   Result:=FLError='';
   if Assigned(FOnCmdRes) then FOnCmdRes(Self,FThread.FStdOut,FThread.FStdErr,FThread.FErrorLevel);
   if Assigned(FWaitingEnd) then FWaitingEnd(Self);
@@ -267,10 +265,14 @@ begin
   end;
 
   if Result then begin
-    sl:=Explode(#$D#$A,FThread.FSTDOut);
-    Alist.Clear;
-    for i := 0 to sl.Count-1 do if Trim(sl[i])<>'' then AList.Add(Trim(sl[i]));
-    sl.Free
+    sl:=TStringList.Create;
+    try
+      KRSplitStr(FThread.FSTDOut,#$D#$A,sl);
+      Alist.Clear;
+      for i := 0 to sl.Count-1 do if Trim(sl[i])<>'' then AList.Add(Trim(sl[i]));
+    finally
+      sl.Free
+    end;
   end;
 end;
 

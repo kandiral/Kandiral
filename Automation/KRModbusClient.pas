@@ -12,51 +12,15 @@ unit KRModbusClient;
 
 interface
 
-{$I '..\Includes\language.inc'}
-
 uses
   {$IF CompilerVersion >= 23}
     Winapi.Windows, System.Classes, System.SysUtils, System.AnsiStrings, System.Variants,
-    System.StrUtils, Vcl.Forms, Winapi.Messages,
+    System.StrUtils, Vcl.Forms, Winapi.Messages, System.SyncObjs,
   {$ELSE}
-    Windows, Classes, SysUtils, AnsiStrings, Variants, StrUtils, Forms, Messages,
+    Windows, Classes, SysUtils, AnsiStrings, Variants, StrUtils, Forms, Messages, SyncObjs,
   {$IFEND}
-  KRModbus, KRModbusMaster, KRVariables, KRComponentCollection, Funcs, lgop,
-  KRIniConfig, KRTypes, KRThreadQueue;
-
-type
-  TMBCError = integer;
-
-const
-  MBC_ERRORS_COUNT = 7;
-
-  mbceAskLimit = TMBCError(65536);
-  mbceFileNotFount = TMBCError(65537);
-  mbceFileDeleteError = TMBCError(65538);
-  mbceFileOpenForReadError = TMBCError(65539);
-  mbceFileReadError = TMBCError(65540);
-  mbceFileOpenForWriteError = TMBCError(65541);
-  mbceFileWriteError = TMBCError(65542);
-
-  MBC_ERRORS_MSG : array[0..MBC_ERRORS_COUNT-1] of String = (
-{$IFDEF RUSSIAN_LANGUAGE}
-    'Превышен лимит ожидания ответа от потока',
-    'Файл не найден',
-    'Не удалось удалить файл',
-    'Не удается открыть файл для чтения',
-    'Ошибка чтения файла',
-    'Не удается открыть файл для записи',
-    'Ошибка записи в файла'
-{$ELSE}
-    'Timeout receive response from the thread',
-    'File not found',
-    'Failed to delete file',
-    'Can''t open file for reading',
-    'File read error',
-    'Can''t open file for writing',
-    'Error writing to file'
-{$ENDIF}
-  );
+  KRModbusClientLng, KRModbus, KRModbusMaster, KRVariables, KRComponentCollection,
+  KRIniConfig, KRTypes, KRThreadQueue, lgop, funcs;
 
 type
   TMBReadFunction = (mbrfReadHoldingRegisters, mbrfReadInputRegisters);
@@ -198,7 +162,6 @@ type
     procedure SetReadFunction(const Value: TMBReadFunction);
     procedure SetWriteFunction(const Value: TMBWriteFunction);
     procedure SetMCVarType(const Value: TMCVarType);
-    procedure DoError(isUp: boolean);
     procedure SetFileRegs(const Value: byte);
     procedure FileSendName;
     procedure FileSendName_;
@@ -215,15 +178,12 @@ type
   protected
     function GetError: integer;override;
     procedure SetType(const Value: TVarType);override;
-    procedure SetValue_(const Value: Variant);override;
-    procedure SetValue_c(AValue: Variant);override;
+    procedure SetValueRequest(var Value: Variant);override;
     function GetErrorMsg: String;override;
     procedure SetStrLen(const Value: Byte);
-    procedure UpdateValue_;override;
-    procedure UpdateValue_c(AVal: Variant);override;
+    procedure UpdateValueRequest;override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     procedure _ParamChange(AParam: TKRIniCfgParam);override;
-    procedure SetInterval(const AValue: Integer);
   public
     constructor Create(AOwner: TComponent);override;
     destructor Destroy;override;
@@ -255,23 +215,79 @@ type
     property HighByteFirst: boolean read FHighByteFirst write FHighByteFirst default true;
     property HighWordFirst: boolean read FHighWordFirst write FHighWordFirst default false;
     property HighDWordFirst: boolean read FHighDWordFirst write FHighDWordFirst default false;
+
     property Interval default 0;
+    property IntervalMin default 5;
+    property UpdateType default vutAfter;
+    property UpAftWrite;
+    property WaitForUpdates;
+
     property CfgInterval;
     property CfgValue;
-    property UpdateType default vutAfter;
     property OnValUpdated;
     property OnError;
-    property UpAftWrite;
     property UserError;
     property UserErrorMsg;
     property OnRuntimeError;
-    property WaitForUpdates;
     property OnFile: TNotifyEvent read FOnFile write FOnFile;
+  end;
+
+  TKRMBCBatchUpdates = class;
+
+  TKRMBCBatchUpdate = class(TCollectionItem)
+  private
+    FWH: HWND;
+    FRequestTM: cardinal;
+    regs: TKRRegisters;
+    FRegsLen: integer;
+    FCount: Word;
+    FInterval: Cardinal;
+    FIndex: Word;
+    FIntervalMin: cardinal;
+    FReadFunction: TMBReadFunction;
+    FReadPack: TKRBuffer;
+    FReadPackLen,FReadPackRLen: byte;
+    FReadPackFunc: TMBFunc;
+    procedure TmWP(var Msg: TMessage);
+    procedure SetInterval(const Value: Cardinal);
+    procedure SetReadFunction(const Value: TMBReadFunction);
+    procedure MBCallBack(AError: integer; AData: Pointer);
+    procedure SetCount(const Value: Word);
+    procedure SetRegIndex(const Value: Word);
+  protected
+    procedure AssignTo(Dest: TPersistent); override;
+  public
+    constructor Create(Collection: TCollection);override;
+    destructor Destroy;override;
+    procedure UpdateReadPack;
+  published
+    property RegisterIndex: Word read FIndex write SetRegIndex default 0;
+    property Count: Word read FCount write SetCount default 1;
+    property Interval: Cardinal read FInterval write SetInterval default 0;
+    property IntervalMin: cardinal read FIntervalMin write FIntervalMin default 5;
+    property ReadFunction: TMBReadFunction read FReadFunction write SetReadFunction default mbrfReadHoldingRegisters;
+  end;
+
+  TKRMBCBatchUpdates = class(TCollection)
+  private
+    FMBC: TKRModbusClient;
+    function GetBUItem(Index: integer): TKRMBCBatchUpdate;
+    procedure SetBUItem(Index: integer; const Value: TKRMBCBatchUpdate);
+  public
+    constructor Create(AOwner: TComponent);
+    function GetOwner: TPersistent;override;
+    property Items[Index: integer]: TKRMBCBatchUpdate read GetBUItem write SetBUItem; default;
   end;
 
   TKRMCStream = record
     i: integer;
     _stack: TKRThreadQueue;
+  end;
+
+  TKRMCStream2 = record
+    Wait: boolean;
+    RegIndex: integer;
+    list: TList;
   end;
 
   TKRMCWDStream = record
@@ -308,9 +324,13 @@ type
     FMBType: TMBType;
     FModbus: TKRModBusMaster;
 
-    FWDStreams,  FDWStreams, FBTStreams, FSINTStreams: array of TKRMCStream;
-    FWDStreamsW, FDWStreamsW, FBTStreamsW, FSINTStreamsW: array of boolean;
-    KRMBC_DW_lock, KRMBC_WD_lock, KRMBC_BT_lock, KRMBC_SINT_lock: TObject;
+    FDWStreams, FBTStreams, FSINTStreams: array of TKRMCStream;
+    FDWStreamsW, FBTStreamsW, FSINTStreamsW: array of boolean;
+    KRMBC_DW_lock, KRMBC_BT_lock, KRMBC_SINT_lock: TObject;
+
+    WDStreamCS: TCriticalSection;
+    WDStreams: array of TKRMCStream2;
+    FBatchUpdates: TKRMBCBatchUpdates;
 
     function WDStreamAdd(ARegIndex: integer): integer;
     function DWStreamAdd(ARegIndex: integer): integer;
@@ -336,20 +356,19 @@ type
     procedure SetModbus(const Value: TKRModbusMaster);
     procedure SetAddres(const Value: byte);
     procedure SetMBType(const Value: TMBType);
-    function GetActive: boolean;
+    procedure SetBatchUpdates(const Value: TKRMBCBatchUpdates);
   protected
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     procedure AftAddItem(var AItem: TKRComponentCollectionItem);override;
-    procedure SetActive(const Value: boolean);override;
   public
     constructor Create(AOwner: TComponent);override;
     destructor Destroy; override;
-    property Active: boolean read GetActive write SetActive;
     function AddVar(AName: String; AType: TMCVarType; AIndex: word; AInterval: Integer = 0):TKRMBRegister;
   published
     property Modbus: TKRModbusMaster read FModbus write SetModbus;
     property Addres: byte read FAddres write SetAddres default 0;
     property MBType: TMBType read FMBType write SetMBType default mbtTCP;
+    property BatchUpdates: TKRMBCBatchUpdates read FBatchUpdates write SetBatchUpdates;
   end;
 
 implementation
@@ -450,34 +469,38 @@ end;
 constructor TKRModbusClient.Create(AOwner: TComponent);
 begin
   inherited;
+  WDStreamCS:=TCriticalSection.Create;
+
+
   KRMBC_DW_lock := TObject.Create;
-  KRMBC_WD_lock := TObject.Create;
   KRMBC_BT_lock := TObject.Create;
   KRMBC_SINT_lock := TObject.Create;
 
   FAddres:=0;
   FMBType:=mbtTCP;
+
+  FBatchUpdates:=TKRMBCBatchUpdates.Create(Self);
+
   inherited SetItemClass(TKRMBRegister);
 end;
 
 destructor TKRModbusClient.Destroy;
 var
-  i: integer;
-  pWD: PKRMCWDStream;
+  i,j: integer;
   pDW: PKRMCDWStream;
   pBT: PKRMCBTStream;
   pSINT: PKRMCSINTStream;
 begin
   KRMBC_DW_lock.Free;
-  KRMBC_WD_lock.Free;
   KRMBC_BT_lock.Free;
   KRMBC_SINT_lock.Free;
 
-  for i := 0 to Length(FWDStreams)-1 do
-    while FWDStreams[i]._stack.Count>0 do begin
-      pWD:=FWDStreams[i]._stack.Pop;
-      Dispose(pWD);
+  for i := 0 to Length(WDStreams)-1 do begin
+    for j:=0 to WDStreams[i].List.Count-1 do begin
+      Dispose(WDStreams[i].List[j]);
     end;
+    WDStreams[i].List.Free;
+  end;
 
   for i := 0 to Length(FDWStreams)-1 do
     while FDWStreams[i]._stack.Count>0 do begin
@@ -497,6 +520,8 @@ begin
       Dispose(pSINT);
     end;
 
+  WDStreamCS.Free;
+  FBatchUpdates.Free;
   inherited;
 end;
 
@@ -572,11 +597,6 @@ begin
   System.TMonitor.Exit(KRMBC_DW_lock);
 end;
 
-function TKRModbusClient.GetActive: boolean;
-begin
-  result:=Inherited Active;
-end;
-
 procedure TKRModbusClient.Notification(AComponent: TComponent;
   Operation: TOperation);
 var
@@ -593,20 +613,18 @@ begin
     end;
 end;
 
-procedure TKRModbusClient.SetActive(const Value: boolean);
-begin
-  if GetActive=Value then exit;
-  
-  if(Value)and(not Assigned(FModbus))then exit;
-  inherited;
-end;
-
 procedure TKRModbusClient.SetAddres(const Value: byte);
 var
   i: integer;
 begin
   FAddres := Value;
-  for i := 0 to ItemsCount-1 do TKRMBRegister(Items[i]).UpdateReadPack
+  for i := 0 to ItemsCount-1 do TKRMBRegister(Items[i]).UpdateReadPack;
+  for i := 0 to FBatchUpdates.Count-1 do FBatchUpdates.Items[i].UpdateReadPack;
+end;
+
+procedure TKRModbusClient.SetBatchUpdates(const Value: TKRMBCBatchUpdates);
+begin
+  FBatchUpdates.Assign(Value);
 end;
 
 procedure TKRModbusClient.SetMBType(const Value: TMBType);
@@ -614,7 +632,8 @@ var
   i: integer;
 begin
   FMBType := Value;
-  for i := 0 to ItemsCount-1 do TKRMBRegister(Items[i]).UpdateReadPack
+  for i := 0 to ItemsCount-1 do TKRMBRegister(Items[i]).UpdateReadPack;
+  for i := 0 to FBatchUpdates.Count-1 do FBatchUpdates.Items[i].UpdateReadPack;
 end;
 
 procedure TKRModbusClient.SetModbus(const Value: TKRModbusMaster);
@@ -633,6 +652,7 @@ begin
         TKRMBRegister(Items[i])._mb:=FModbus;
         TKRMBRegister(Items[i]).UpdateReadPack
       end;
+      for i := 0 to FBatchUpdates.Count-1 do FBatchUpdates.Items[i].UpdateReadPack;
       if b then Active:=true;
     end;
   end;
@@ -712,74 +732,93 @@ end;
 
 function TKRModbusClient.WDStreamAdd(ARegIndex: integer): integer;
 var
-  i: integer;
+  i,n: integer;
 begin
-  System.TMonitor.Enter(KRMBC_WD_lock);
   Result:=-1;
-  for i := 0 to Length(FWDStreams)-1 do
-    if FWDStreams[i].i=ARegIndex then begin
-      Result:=i;
-      break;
+  WDStreamCS.Enter;
+  try
+    n:=Length(WDStreams)-1;
+    for i := 0 to n do
+      if WDStreams[i].RegIndex=ARegIndex then begin
+        Result:=i;
+        break;
+      end;
+    if Result=-1 then begin
+      Result:=Length(WDStreams);
+      SetLength(WDStreams,Result+1);
+      WDStreams[Result].Wait:=false;
+      WDStreams[Result].RegIndex:=ARegIndex;
+      WDStreams[Result].list:=TList.Create;
     end;
-  if Result=-1 then begin
-    Result:=Length(FWDStreams);
-    SetLength(FWDStreams,Result+1);
-    SetLength(FWDStreamsW,Result+1);
-    FWDStreamsW[Result]:=false;
-    FWDStreams[Result].i:=ARegIndex;
-    FWDStreams[Result]._stack:=TKRThreadQueue.Create;
+  finally
+    WDStreamCS.Leave;
   end;
-  System.TMonitor.Exit(KRMBC_WD_lock);
 end;
 
 procedure TKRModbusClient.WDStreamDel(AIndex: integer);
 var
   _p: PKRMCWDStream;
 begin
-  System.TMonitor.Enter(KRMBC_WD_lock);
-  FWDStreamsW[AIndex]:=false;
-  if FWDStreams[AIndex]._stack.Count>0 then begin
-    _p:=FWDStreams[AIndex]._stack.Pop;
-    if Assigned(_p.upProc) then begin _p.upProc;FWDStreamsW[AIndex]:=true;end else
-    if Assigned(_p.setProc) then begin _p.setProc(_p.val);FWDStreamsW[AIndex]:=true;end;
+  _p:=nil;
+  WDStreamCS.Enter;
+  try
+    if WDStreams[AIndex].list.Count>0 then begin
+      _p:=WDStreams[AIndex].list[WDStreams[AIndex].list.Count-1];
+       WDStreams[AIndex].list.Delete(WDStreams[AIndex].list.Count-1);
+    end;
+  finally
+    WDStreamCS.Leave;
+  end;
+  if _p=nil then WDStreams[AIndex].Wait:=false else begin
+    if Assigned(_p.upProc) then _p.upProc else _p.setProc(_p.val);
     Dispose(_p);
   end;
-  System.TMonitor.Exit(KRMBC_WD_lock);
 end;
 
 procedure TKRModbusClient.WDStreamSet(AIndex: integer;
   AProc: TMBSetStreamProcWD; AValue: Word);
 var
   p: PKRMCWDStream;
+  prc: TMBSetStreamProcWD;
+  vl: word;
 begin
-  System.TMonitor.Enter(KRMBC_WD_lock);
-  if FWDStreamsW[AIndex] then begin
-    New(p);
-    p.upProc:=nil;
-    p.setProc:=AProc;
-    p.val:=AValue;
-    FWDStreams[AIndex]._stack.Push(p);
-  end else begin
-    FWDStreamsW[AIndex]:=true;
-    AProc(AValue);
+  prc:=nil;
+  WDStreamCS.Enter;
+  try
+    if WDStreams[AIndex].Wait then begin
+      New(p);
+      p.upProc:=nil;
+      p.setProc:=AProc;
+      p.val:=AValue;
+      WDStreams[AIndex].list.Insert(0,p);
+    end else begin
+      WDStreams[AIndex].Wait:=true;
+      prc:=AProc;
+      vl:=AValue;
+    end;
+  finally
+    WDStreamCS.Leave;
   end;
-  System.TMonitor.Exit(KRMBC_WD_lock);
+  if Assigned(prc) then prc(vl);
 end;
 
 procedure TKRModbusClient.WDStreamUp(AIndex: integer; AProc: TMBUpStreamProc);
 var
   p: PKRMCWDStream;
 begin
-  System.TMonitor.Enter(KRMBC_WD_lock);
-  if FWDStreamsW[AIndex] then begin
-    New(p);
-    p.upProc:=AProc;
-    FWDStreams[AIndex]._stack.Push(p);
-  end else begin
-    FWDStreamsW[AIndex]:=true;
-    AProc;
+  WDStreamCS.Enter;
+  try
+    if WDStreams[AIndex].Wait then begin
+      New(p);
+      p.upProc:=AProc;
+      WDStreams[AIndex].list.Insert(0,p);
+    end else begin
+      WDStreams[AIndex].Wait:=true;
+      AProc;
+    end;
+  finally
+    WDStreamCS.Leave;
   end;
-  System.TMonitor.Exit(KRMBC_WD_lock);
 end;
 
 { TKRMBRegister }
@@ -814,19 +853,19 @@ begin
   if AError=0 then begin
     wd:=MBRegsToWord(PKRRegisters(AData)^);
     if wd shr 14 = 0 then begin
-      UpdateValue_c(Byte(wd));
+      UpdateValueResponse(Byte(wd));
       _mbc.BTStreamDel(FUpIndex);
     end else begin
       inc(FAskCnt);
       if FAskCnt<FAskLimit then BT_STREAM_up_r else begin
         _mbc.BTStreamDel(FUpIndex);
         FError:=mbceAskLimit;
-        DoError(true);
+        DoError;
       end;
     end;
   end else begin
     _mbc.BTStreamDel(FUpIndex);
-    DoError(true);
+    DoError;
   end;
 end;
 
@@ -837,7 +876,7 @@ begin
   if AError=0 then BT_STREAM_up_r
   else begin
     _mbc.BTStreamDel(FUpIndex);
-    DoError(true);
+    DoError;
   end;
 end;
 
@@ -871,19 +910,19 @@ begin
   if AError=0 then begin
     wd:=MBRegsToWord(PKRRegisters(AData)^);
     if wd shr 14 = 0 then begin
-      SetValue_c(FTmpVal);
+      SetValueResponse(FTmpVal);
       _mbc.BTStreamDel(FUpIndex);
     end else begin
       inc(FAskCnt);
       if FAskCnt<FAskLimit then BT_STREAM_wr_r else begin
         _mbc.BTStreamDel(FUpIndex);
         FError:=mbceAskLimit;
-        DoError(false);
+        DoError;
       end;
     end;
   end else begin
     _mbc.BTStreamDel(FUpIndex);
-    DoError(false);
+    DoError;
   end;
 end;
 
@@ -894,18 +933,15 @@ begin
   if AError=0 then BT_STREAM_wr_r
   else begin
     _mbc.BTStreamDel(FUpIndex);
-    DoError(false);
+    DoError;
   end;
 end;
 
 constructor TKRMBRegister.Create(AOwner: TComponent);
 begin
   inherited;
-
-//  tLog:='';
-
   FIndex:=0;
-  FError:=0;
+  FError:=mbceNoValue;
   FCount:=1;
   FReadPackLen:=0;
   SetStrLen(4);
@@ -933,18 +969,11 @@ begin
   inherited;
 end;
 
-procedure TKRMBRegister.DoError(isUp: boolean);
-begin
-  inherited DoError(isUp);
-end;
-
 procedure TKRMBRegister.DWSTR_up(ACmd: Cardinal);
 var
   wd0:word;
   _Data:TKRRegisters;
 begin
-//tLog:=tLog+#13#10+'DWSTR_up cmd='+IntToStr(ACmd);
-
   if ACmd=$3000000 then FDWSTR:='';
   case FWriteFunction of
     mbwfWriteHoldingRegister: begin
@@ -961,7 +990,6 @@ end;
 
 procedure TKRMBRegister.DWSTR_up_r;
 begin
-//tLog:=tLog+#13#10+'DWSTR_up_r';
   _mb.SendPack(_mbc.FMBType,FReadPackFunc,@FReadPack,FReadPackLen,DWSTR_up_rcb,FReadPackRLen)
 end;
 
@@ -971,13 +999,10 @@ var
   wd0,wd1: word;
   bt0,bt1,bt2,bt3: byte;
 begin
-//tLog:=tLog+#13#10+'DWSTR_up_rcb';
   FError:=AError;
   if AError=0 then begin
-//tLog:=tLog+#13#10+'DWSTR_up_rcb AError=0';
     dw:=MBRegsToDWORD(PKRRegisters(AData)^);
     if dw shr 24 = 0 then begin
-//tLog:=tLog+#13#10+'DWSTR_up_rcb  dw shr 24 = 0';
       FAskCnt:=0;
       WordsFromDWord(dw,wd0,wd1);
       BytesFromWord(wd0,bt0,bt1);
@@ -988,35 +1013,33 @@ begin
           FDWSTR:=FDWSTR+AnsiChar(bt1);
           if bt2>0 then begin
             FDWSTR:=FDWSTR+AnsiChar(bt2);
-//tLog:=tLog+#13#10+'DWSTR_up_rcb  FDWSTR='+FDWSTR;
             DWSTR_up($4000000);
-          end else UpdateValue_c(StringToWideString(FDWSTR,1251));
-        end else UpdateValue_c(StringToWideString(FDWSTR,1251));
-      end else UpdateValue_c(StringToWideString(FDWSTR,1251));
+          end else UpdateValueResponse(StringToWideString(FDWSTR,1251));
+        end else UpdateValueResponse(StringToWideString(FDWSTR,1251));
+      end else UpdateValueResponse(StringToWideString(FDWSTR,1251));
     end else begin
       inc(FAskCnt);
       if FAskCnt<FAskLimit then DWSTR_up_r else begin
         FError:=mbceAskLimit;
-        DoError(true);
+        DoError;
       end;
     end;
-  end else DoError(true);
+  end else DoError;
 end;
 
 procedure TKRMBRegister.DWSTR_up_wcb(AError: integer; AData: Pointer);
 begin
-//tLog:=tLog+#13#10+'DWSTR_up_wcb';
   FError:=AError;
   FAskCnt:=0;
   if AError=0 then DWSTR_up_r
-  else DoError(true);
+  else DoError;
 end;
 
 procedure TKRMBRegister.DWSTR_up_wcb0(AError: integer; AData: Pointer);
 begin
   FError:=AError;
   if AError=0 then _mb.WriteHoldingRegister(_mbc.FMBType,_mbc.FAddres,FIndex+1,FTmpWd0,DWSTR_up_wcb)
-  else DoError(true);
+  else DoError;
 end;
 
 procedure TKRMBRegister.DWSTR_wr(ACmd: byte);
@@ -1026,7 +1049,6 @@ var
   bt0,bt1,bt2: byte;
   _Data: TKRRegisters;
 begin
-//tLog:=tLog+#13#10+'DWSTR_wr Cmd='+IntToStr(ACmd)+' FDWSTR='+FDWSTR;
   bt1:=0;bt2:=0;
   if Length(FDWSTR)>0 then begin
     bt0:=Ord(FDWSTR[1]);
@@ -1069,17 +1091,17 @@ begin
     if dw shr 24 = 0 then begin
       FAskCnt:=0;
       if FDWSTR_end then begin
-        SetValue_c(FTmpVal)
+        SetValueResponse(FTmpVal)
       end else
         DWSTR_wr(2);
     end else begin
       inc(FAskCnt);
       if FAskCnt>=FAskLimit then begin
         FError:=mbceAskLimit;
-        DoError(false);
+        DoError;
       end else DWSTR_wr_r;
     end;
-  end else DoError(false);
+  end else DoError;
 end;
 
 procedure TKRMBRegister.DWSTR_wr_wcb(AError: integer; AData: Pointer);
@@ -1087,14 +1109,14 @@ begin
   FError:=AError;
   FAskCnt:=0;
   if AError=0 then DWSTR_wr_r
-  else DoError(false);
+  else DoError;
 end;
 
 procedure TKRMBRegister.DWSTR_wr_wcb0(AError: integer; AData: Pointer);
 begin
   FError:=AError;
   if AError=0 then _mb.WriteHoldingRegister(_mbc.FMBType,_mbc.FAddres,FIndex+1,FTmpWd0,DWSTR_wr_wcb)
-  else DoError(false);
+  else DoError;
 end;
 
 procedure TKRMBRegister.DW_STREAM_up(AFirst: boolean);
@@ -1138,7 +1160,7 @@ begin
         DW_STREAM_up(false);
       end else begin
         dw:=WordsToDWORD(FTmpWD1,Word(dw));
-        UpdateValue_c(dw);
+        UpdateValueResponse(dw);
         _mbc.DWStreamDel(FUpIndex);
       end;
     end else begin
@@ -1146,12 +1168,12 @@ begin
       if FAskCnt<FAskLimit then DW_STREAM_up_r else begin
         _mbc.DWStreamDel(FUpIndex);
         FError:=mbceAskLimit;
-        DoError(true);
+        DoError;
       end;
     end;
   end else begin
     _mbc.DWStreamDel(FUpIndex);
-    DoError(true);
+    DoError;
   end;
 end;
 
@@ -1162,7 +1184,7 @@ begin
   if AError=0 then DW_STREAM_up_r
   else begin
     _mbc.DWStreamDel(FUpIndex);
-    DoError(true);
+    DoError;
   end;
 end;
 
@@ -1172,7 +1194,7 @@ begin
   if AError=0 then _mb.WriteHoldingRegister(_mbc.FMBType,_mbc.FAddres,FIndex+1,FTmpWd0,DW_STREAM_up_wcb)
   else begin
     _mbc.DWStreamDel(FUpIndex);
-    DoError(true);
+    DoError;
   end;
 end;
 
@@ -1219,7 +1241,7 @@ begin
     if dw shr 24 = 0 then begin
       if FDW_STREAM_First=3 then DW_STREAM_wr(false,FTmpDW0)
       else begin
-        SetValue_c(FTmpVal);
+        SetValueResponse(FTmpVal);
         _mbc.DWStreamDel(FUpIndex);
       end;
     end else begin
@@ -1227,12 +1249,12 @@ begin
       if FAskCnt<FAskLimit then DW_STREAM_wr_r else begin
         _mbc.DWStreamDel(FUpIndex);
         FError:=mbceAskLimit;
-        DoError(false);
+        DoError;
       end;
     end;
   end else begin
     _mbc.DWStreamDel(FUpIndex);
-    DoError(false);
+    DoError;
   end;
 end;
 
@@ -1243,7 +1265,7 @@ begin
   if AError=0 then DW_STREAM_wr_r
   else begin
     _mbc.DWStreamDel(FUpIndex);
-    DoError(false);
+    DoError;
   end;
 end;
 
@@ -1253,7 +1275,7 @@ begin
   if AError=0 then _mb.WriteHoldingRegister(_mbc.FMBType,_mbc.FAddres,FIndex+1,FTmpWd0,DW_STREAM_wr_wcb)
   else begin
     _mbc.DWStreamDel(FUpIndex);
-    DoError(false);
+    DoError;
   end;
 end;
 
@@ -1300,13 +1322,13 @@ begin
     PKRMBRegFileInfo(FFileData)^.dtCreation:=MKTimeToDateTime(Cardinal(PKRRegisters(AData)^[3]) or (Cardinal(PKRRegisters(AData)^[4]) shl 16));
     PKRMBRegFileInfo(FFileData)^.dtLastAccess:=MKTimeToDateTime(Cardinal(PKRRegisters(AData)^[5]) or (Cardinal(PKRRegisters(AData)^[6]) shl 16));
     PKRMBRegFileInfo(FFileData)^.dtLastModification:=MKTimeToDateTime(Cardinal(PKRRegisters(AData)^[7]) or (Cardinal(PKRRegisters(AData)^[8]) shl 16));
-		UpdateValue_c(NULL);
+		UpdateValueResponse(NULL);
 		FFileProcess:=0;
   end else begin
     inc(FAskCnt);
     if FAskCnt>=FAskLimit then begin
       FError:=mbceAskLimit;
-      DoError(false);
+      DoError;
       FFileProcess:=2;
       if Assigned(FOnFile) then FOnFile(Self);
     end else
@@ -1342,7 +1364,7 @@ begin
   end else begin
     inc(FFileErrors);
     if FFileErrors>4 then begin
-      DoError(false);
+      DoError;
       FFileProcess:=2;
       if Assigned(FOnFile) then FOnFile(Self);
     end else
@@ -1360,7 +1382,7 @@ begin
       if wd and $FF = $FF then begin
         FError:=mbceFileReadError;
         FFileProcess:=2;
-        DoError(false);
+        DoError;
         if Assigned(FOnFile) then FOnFile(Self);
       end else begin
         FFileStat:=wd and $FF;
@@ -1370,7 +1392,7 @@ begin
       inc(FAskCnt);
       if FAskCnt>=FAskLimit then begin
         FError:=mbceAskLimit;
-        DoError(false);
+        DoError;
         FFileProcess:=2;
         if Assigned(FOnFile) then FOnFile(Self);
       end else
@@ -1379,7 +1401,7 @@ begin
   end else begin
     inc(FFileErrors);
     if FFileErrors>4 then begin
-      DoError(false);
+      DoError;
       FFileProcess:=2;
       if Assigned(FOnFile) then FOnFile(Self);
     end else
@@ -1407,7 +1429,7 @@ begin
     FFilePC.Position:=FFilePC.Size-bt;
     FFilePC.WriteBuffer(buf,bt);
     if GetBit(FFileStat,7) then begin
-      UpdateValue_c(NULL);
+      UpdateValueResponse(NULL);
       FFileProcess:=0;
       if Assigned(FOnFile) then FOnFile(Self);
     end else
@@ -1415,7 +1437,7 @@ begin
   end else begin
     inc(FFileErrors);
     if FFileErrors>4 then begin
-      DoError(false);
+      DoError;
       FFileProcess:=2;
       if Assigned(FOnFile) then FOnFile(Self);
     end else
@@ -1428,7 +1450,7 @@ var _do: byte;
 begin
   if FFileDo=0 then begin
     FError:=mbceFileNotFount;
-    DoError(false);
+    DoError;
     exit;
   end;
   _do:=FFileDo;
@@ -1472,7 +1494,7 @@ begin
   end else begin
     inc(FFileErrors);
     if FFileErrors>4 then begin
-      DoError(false);
+      DoError;
       FFileProcess:=2;
       if Assigned(FOnFile) then FOnFile(Self);
     end else
@@ -1492,7 +1514,7 @@ begin
         if wd=0 then begin
           case (FFileCmd and $7F) of
           1: begin
-              UpdateValue_c(NULL);
+              UpdateValueResponse(NULL);
               FFileProcess:=0;
               if Assigned(FOnFile) then FOnFile(Self);
             end;
@@ -1511,7 +1533,7 @@ begin
             end;
           5: begin
                PDWORD(FFileData)^:=Cardinal(PKRRegisters(AData)^[1]) or (Cardinal(PKRRegisters(AData)^[2]) shl 16);
-              UpdateValue_c(NULL);
+              UpdateValueResponse(NULL);
               FFileProcess:=0;
               if Assigned(FOnFile) then FOnFile(Self);
             end;
@@ -1524,7 +1546,7 @@ begin
           4: FError:=mbceFileOpenForWriteError;
           end;
           FFileProcess:=2;
-          DoError(false);
+          DoError;
           if Assigned(FOnFile) then FOnFile(Self);
         end;
       end;
@@ -1532,7 +1554,7 @@ begin
       inc(FAskCnt);
       if FAskCnt>=FAskLimit then begin
         FError:=mbceAskLimit;
-        DoError(false);
+        DoError;
         FFileProcess:=2;
         if Assigned(FOnFile) then FOnFile(Self);
       end else
@@ -1541,7 +1563,7 @@ begin
   end else begin
     inc(FFileErrors);
     if FFileErrors>4 then begin
-      DoError(false);
+      DoError;
       FFileProcess:=2;
       if Assigned(FOnFile) then FOnFile(Self);
     end else
@@ -1608,7 +1630,7 @@ begin
   end else begin
     inc(FFileErrors);
     if FFileErrors>4 then begin
-      DoError(false);
+      DoError;
       FFileProcess:=2;
       if Assigned(FOnFile) then FOnFile(Self);
     end else
@@ -1625,21 +1647,21 @@ begin
     if(wd shr 8 = $FC)then begin
       if wd and $FF = 0 then begin
         if GetBit(__Data[0],7) then begin
-          UpdateValue_c(NULL);
+          UpdateValueResponse(NULL);
           FFileProcess:=0;
           if Assigned(FOnFile) then FOnFile(Self);
         end else FileWrite_;
       end else begin
         FError:=mbceFileWriteError;
         FFileProcess:=2;
-        DoError(false);
+        DoError;
         if Assigned(FOnFile) then FOnFile(Self);
       end;
     end else begin
       inc(FAskCnt);
       if FAskCnt>=FAskLimit then begin
         FError:=mbceAskLimit;
-        DoError(false);
+        DoError;
         FFileProcess:=2;
         if Assigned(FOnFile) then FOnFile(Self);
       end else
@@ -1648,7 +1670,7 @@ begin
   end else begin
     inc(FFileErrors);
     if FFileErrors>4 then begin
-      DoError(false);
+      DoError;
       FFileProcess:=2;
       if Assigned(FOnFile) then FOnFile(Self);
     end else
@@ -1755,14 +1777,10 @@ begin
   end;
 end;
 
-procedure TKRMBRegister.SetInterval(const AValue: Integer);
-begin
-  if FMCVarType<>MCT_FILE then inherited SetInterval(AValue);
-end;
-
 procedure TKRMBRegister.SetMCVarType(const Value: TMCVarType);
 begin
   FMCVarType := Value;
+  FAllowUpdate:=true;
   case FMCVarType of
     MCT_BYTE: begin inherited SetType(VT_BYTE);FCount:=1;end;
     MCT_WORD: begin inherited SetType(VT_WORD);FCount:=1;end;
@@ -1780,10 +1798,10 @@ begin
       FCount:=((FArrayLen - 1) div 2) + 1;
     end;
     MCT_FILE: begin
-      inherited SetInterval(0);
       inherited SetType(VT_WORD);
       SetWriteFunction(mbwfWriteHoldingRegisters);
       SetFileRegs(FFileRegs);
+      FAllowUpdate:=false;
     end;
     MCT_DWSTR: begin inherited SetType(VT_STRING);FCount:=2;end;
     MCT_WD_STREAM: begin
@@ -1823,8 +1841,8 @@ begin
   if Value=0 then exit;
   FStrLen:=Value;
   if FMCVarType=MCT_STRING then begin
-    FCount:=Value div 2;
-    if Value mod 2 > 0 then Inc(FCount);
+    FCount:=Value shr 1;
+    if (Value and 1) > 0 then Inc(FCount);
     UpdateReadPack;
   end;
 end;
@@ -1834,7 +1852,7 @@ begin
   //
 end;
 
-procedure TKRMBRegister.SetValue_(const Value: Variant);
+procedure TKRMBRegister.SetValueRequest(var Value: Variant);
 var
   bt0,bt1: BYTE;
   wd0: Word;
@@ -1924,13 +1942,6 @@ var
   end;
 
 begin
-  inherited SetValue_(Value);
-  if not _mbc.Active then begin
-    FError:=-mbmeClientNotActive;
-    inherited DoError(false);
-    exit;
-  end;
-
   case FMCVarType of
     MCT_BYTE: begin
       bt0:=Byte(Value);
@@ -2066,11 +2077,6 @@ begin
   end;
 end;
 
-procedure TKRMBRegister.SetValue_c(AValue: Variant);
-begin
-  inherited SetValue_c(AValue);
-end;
-
 procedure TKRMBRegister.SetWriteFunction(const Value: TMBWriteFunction);
 begin
   if FMCVarType=MCT_FILE then FWriteFunction:=mbwfWriteHoldingRegisters
@@ -2112,19 +2118,19 @@ begin
   if AError=0 then begin
     dw:=MBRegsToDWORD(PKRRegisters(AData)^);
     if dw shr 24 = 0 then begin
-      UpdateValue_c(Smallint(dw));
+      UpdateValueResponse(Smallint(dw));
       _mbc.SINTStreamDel(FUpIndex);
     end else begin
       inc(FAskCnt);
       if FAskCnt<FAskLimit then SINT_STREAM_up_r else begin
         _mbc.SINTStreamDel(FUpIndex);
         FError:=mbceAskLimit;
-        DoError(true);
+        DoError;
       end;
     end;
   end else begin
     _mbc.SINTStreamDel(FUpIndex);
-    DoError(true);
+    DoError;
   end;
 end;
 
@@ -2135,7 +2141,7 @@ begin
   if AError=0 then SINT_STREAM_up_r
   else begin
     _mbc.SINTStreamDel(FUpIndex);
-    DoError(true);
+    DoError;
   end;
 end;
 
@@ -2145,7 +2151,7 @@ begin
   if AError=0 then _mb.WriteHoldingRegister(_mbc.FMBType,_mbc.FAddres,FIndex+1,FTmpWd0,SINT_STREAM_up_wcb)
   else begin
     _mbc.SINTStreamDel(FUpIndex);
-    DoError(true);
+    DoError;
   end;
 end;
 
@@ -2182,19 +2188,19 @@ begin
   if AError=0 then begin
     dw:=MBRegsToDWORD(PKRRegisters(AData)^);
     if dw shr 24 = 0 then begin
-      SetValue_c(FTmpVal);
+      SetValueResponse(FTmpVal);
       _mbc.SINTStreamDel(FUpIndex);
     end else begin
       inc(FAskCnt);
       if FAskCnt<FAskLimit then SINT_STREAM_wr_r else begin
         _mbc.SINTStreamDel(FUpIndex);
         FError:=mbceAskLimit;
-        DoError(false);
+        DoError;
       end;
     end;
   end else begin
     _mbc.SINTStreamDel(FUpIndex);
-    DoError(false);
+    DoError;
   end;
 end;
 
@@ -2205,7 +2211,7 @@ begin
   if AError=0 then SINT_STREAM_wr_r
   else begin
     _mbc.SINTStreamDel(FUpIndex);
-    DoError(false);
+    DoError;
   end;
 end;
 
@@ -2215,7 +2221,7 @@ begin
   if AError=0 then _mb.WriteHoldingRegister(_mbc.FMBType,_mbc.FAddres,FIndex+1,FTmpWd0,SINT_STREAM_wr_wcb)
   else begin
     _mbc.SINTStreamDel(FUpIndex);
-    DoError(false);
+    DoError;
   end;
 end;
 
@@ -2250,38 +2256,18 @@ begin
   end;
 end;
 
-procedure TKRMBRegister.UpdateValue_;
+procedure TKRMBRegister.UpdateValueRequest;
 begin
-
-//tLog:=tLog+#13#10+'UpdateValue_ wait';
-  inherited UpdateValue_;
-
-  if not _mbc.Active then begin
-    FError:=-mbmeClientNotActive;
-    inherited DoError(true);
-    if FMCVarType=MCT_FILE then begin
-      FFileProcess:=2;
-      if Assigned(FOnFile) then FOnFile(Self);
-    end;
-    exit;
-  end;
   FTmpArray.len:=0;
-//tLog:=tLog+#13#10+'UpdateValue_ in';
-//  if Terminate then VarUpCS_Leave else
-    case FMCVarType of
-      MCT_DWSTR: DWSTR_up($3000000);
-      MCT_WD_STREAM: _mbc.WDStreamUp(FUpIndex,WD_STREAM_up);
-      MCT_DW_STREAM: _mbc.DWStreamUp(FUpIndex,DW_STREAM_up);
-      MCT_BT_STREAM: _mbc.BTStreamUp(FUpIndex,BT_STREAM_up);
-      MCT_SINT_STREAM: _mbc.SINTStreamUp(FUpIndex,SINT_STREAM_up);
-      MCT_FILE: FileSendName;
-      else _mb.SendPack(_mbc.FMBType,FReadPackFunc,@FReadPack,FReadPackLen,_RCallBack,FReadPackRLen);
-    end;
-end;
-
-procedure TKRMBRegister.UpdateValue_c(AVal: Variant);
-begin
-  inherited UpdateValue_c(AVal);
+  case FMCVarType of
+    MCT_DWSTR: DWSTR_up($3000000);
+    MCT_WD_STREAM: _mbc.WDStreamUp(FUpIndex,WD_STREAM_up);
+    MCT_DW_STREAM: _mbc.DWStreamUp(FUpIndex,DW_STREAM_up);
+    MCT_BT_STREAM: _mbc.BTStreamUp(FUpIndex,BT_STREAM_up);
+    MCT_SINT_STREAM: _mbc.SINTStreamUp(FUpIndex,SINT_STREAM_up);
+    MCT_FILE: FileSendName
+    else _mb.SendPack(_mbc.FMBType,FReadPackFunc,@FReadPack,FReadPackLen,_RCallBack,FReadPackRLen);
+  end;
 end;
 
 procedure TKRMBRegister.WD_STREAM_up;
@@ -2290,7 +2276,6 @@ var
   _Data: TKRRegisters;
   wd0: Word;
 begin
-//REAddLog(Name+' WD_STREAM_up');
   dw:=WordsToDWord(0,BytesToWord(FStreamIndex,1));
   case FWriteFunction of
     mbwfWriteHoldingRegister: begin
@@ -2307,7 +2292,6 @@ end;
 
 procedure TKRMBRegister.WD_STREAM_up_r;
 begin
-//REAddLog(Name+' WD_STREAM_up_r');
   _mb.SendPack(_mbc.FMBType,FReadPackFunc,@FReadPack,FReadPackLen,WD_STREAM_up_rcb,FReadPackRLen)
 end;
 
@@ -2315,47 +2299,44 @@ procedure TKRMBRegister.WD_STREAM_up_rcb(AError: integer; AData: Pointer);
 var
   dw: Cardinal;
 begin
-//REAddLog(Name+' WD_STREAM_up_rcb');
   FError:=AError;
   if AError=0 then begin
     dw:=MBRegsToDWORD(PKRRegisters(AData)^);
     if dw shr 24 = 0 then begin
-      UpdateValue_c(Word(dw));
       _mbc.WDStreamDel(FUpIndex);
+      UpdateValueResponse(Word(dw));
     end else begin
       inc(FAskCnt);
       if FAskCnt<FAskLimit then WD_STREAM_up_r else begin
         _mbc.WDStreamDel(FUpIndex);
         FError:=mbceAskLimit;
-        DoError(true);
+        DoError;
       end;
     end;
   end else begin
     _mbc.WDStreamDel(FUpIndex);
-    DoError(true);
+    DoError;
   end;
 end;
 
 procedure TKRMBRegister.WD_STREAM_up_wcb(AError: integer; AData: Pointer);
 begin
-//REAddLog(Name+' WD_STREAM_up_wcb');
   FError:=AError;
   FAskCnt:=0;
   if AError=0 then WD_STREAM_up_r
   else begin
     _mbc.WDStreamDel(FUpIndex);
-    DoError(true);
+    DoError;
   end;
 end;
 
 procedure TKRMBRegister.WD_STREAM_up_wcb0(AError: integer; AData: Pointer);
 begin
-//REAddLog(Name+' WD_STREAM_up_wcb0');
   FError:=AError;
   if AError=0 then _mb.WriteHoldingRegister(_mbc.FMBType,_mbc.FAddres,FIndex+1,FTmpWd0,WD_STREAM_up_wcb)
   else begin
     _mbc.WDStreamDel(FUpIndex);
-    DoError(true);
+    DoError;
   end;
 end;
 
@@ -2392,19 +2373,19 @@ begin
   if AError=0 then begin
     dw:=MBRegsToDWORD(PKRRegisters(AData)^);
     if dw shr 24 = 0 then begin
-      SetValue_c(FTmpVal);
       _mbc.WDStreamDel(FUpIndex);
+      SetValueResponse(FTmpVal);
     end else begin
       inc(FAskCnt);
       if FAskCnt<FAskLimit then WD_STREAM_wr_r else begin
         _mbc.WDStreamDel(FUpIndex);
         FError:=mbceAskLimit;
-        DoError(false);
+        DoError;
       end;
     end;
   end else begin
     _mbc.WDStreamDel(FUpIndex);
-    DoError(false);
+    DoError;
   end;
 end;
 
@@ -2415,7 +2396,7 @@ begin
   if AError=0 then WD_STREAM_wr_r
   else begin
     _mbc.WDStreamDel(FUpIndex);
-    DoError(false);
+    DoError;
   end;
 end;
 
@@ -2425,7 +2406,7 @@ begin
   if AError=0 then _mb.WriteHoldingRegister(_mbc.FMBType,_mbc.FAddres,FIndex+1,FTmpWd0,WD_STREAM_wr_wcb)
   else begin
     _mbc.WDStreamDel(FUpIndex);
-    DoError(false);
+    DoError;
   end;
 end;
 
@@ -2436,13 +2417,13 @@ begin
   FError:=AError;
   if AError=0 then begin
     inc(FTmpArrayI);
-    if FTmpArrayI*2>=FTmpArray.len then SetValue_c(FTmpVal) else begin
+    if FTmpArrayI*2>=FTmpArray.len then SetValueResponse(FTmpVal) else begin
       bt0:=0;bt1:=0;
       if FTmpArray.len>FTmpArrayI*2 then bt1:=FTmpArray.buf[FTmpArrayI*2];
       if FTmpArray.len>FTmpArrayI*2+1 then bt0:=FTmpArray.buf[FTmpArrayI*2+1];
       _mb.WriteHoldingRegister(_mbc.FMBType,_mbc.FAddres,FIndex+1,BytesToWord(bt0,bt1),_ArrayWCallBack)
     end;
-  end else DoError(false);
+  end else DoError;
 end;
 
 procedure TKRMBRegister._ParamChange(AParam: TKRIniCfgParam);
@@ -2463,25 +2444,33 @@ procedure TKRMBRegister._RCallBack(AError: integer; AData: Pointer);
 var
   i: integer;
   wd: word;
+  async: boolean;
 begin
-  FError:=AError;
+  if AError=-2147483648 then begin
+    FError:=0;
+    async:=true;
+  end else begin
+    FError:=AError;
+    async:=false;
+  end;
+
   if FError=0 then begin
     try
       case FMCVarType of
       MCT_BYTE: begin
         wd:=MBRegsToWORD(PKRRegisters(AData)^,FHighByteFirst);
         hiByte:=wd shr 8;
-        UpdateValue_c(Byte(wd and $ff));
+        UpdateValueResponse(Byte(wd and $ff));
       end;
-      MCT_WORD: UpdateValue_c(MBRegsToWORD(PKRRegisters(AData)^,FHighByteFirst));
-      MCT_SMALLINT: UpdateValue_c(MBRegsToSMALLINT(PKRRegisters(AData)^,FHighByteFirst));
-      MCT_DWORD: UpdateValue_c(MBRegsToDWORD(PKRRegisters(AData)^,FHighWordFirst,FHighByteFirst));
-      MCT_INT: UpdateValue_c(MBRegsToINT(PKRRegisters(AData)^,FHighWordFirst,FHighByteFirst));
-      MCT_SINGLE: UpdateValue_c(MBRegsToSINGLE(PKRRegisters(AData)^,FHighWordFirst,FHighByteFirst));
-      MCT_UINT64: UpdateValue_c(MBRegsToUINT64(PKRRegisters(AData)^,FHighDWordFirst,FHighWordFirst,FHighByteFirst));
-      MCT_INT64: UpdateValue_c(MBRegsToINT64(PKRRegisters(AData)^,FHighDWordFirst,FHighWordFirst,FHighByteFirst));
-      MCT_DOUBLE: UpdateValue_c(MBRegsToDouble(PKRRegisters(AData)^,FHighDWordFirst,FHighWordFirst,FHighByteFirst));
-      MCT_STRING: UpdateValue_c(LeftStr(MBRegsToSTRING(PKRRegisters(AData)^,FHighByteFirst), FStrLen));
+      MCT_WORD: UpdateValueResponse(MBRegsToWORD(PKRRegisters(AData)^,FHighByteFirst),async);
+      MCT_SMALLINT: UpdateValueResponse(MBRegsToSMALLINT(PKRRegisters(AData)^,FHighByteFirst),async);
+      MCT_DWORD: UpdateValueResponse(MBRegsToDWORD(PKRRegisters(AData)^,FHighWordFirst,FHighByteFirst),async);
+      MCT_INT: UpdateValueResponse(MBRegsToINT(PKRRegisters(AData)^,FHighWordFirst,FHighByteFirst),async);
+      MCT_SINGLE: UpdateValueResponse(MBRegsToSINGLE(PKRRegisters(AData)^,FHighWordFirst,FHighByteFirst),async);
+      MCT_UINT64: UpdateValueResponse(MBRegsToUINT64(PKRRegisters(AData)^,FHighDWordFirst,FHighWordFirst,FHighByteFirst),async);
+      MCT_INT64: UpdateValueResponse(MBRegsToINT64(PKRRegisters(AData)^,FHighDWordFirst,FHighWordFirst,FHighByteFirst),async);
+      MCT_DOUBLE: UpdateValueResponse(MBRegsToDouble(PKRRegisters(AData)^,FHighDWordFirst,FHighWordFirst,FHighByteFirst),async);
+      MCT_STRING: UpdateValueResponse(LeftStr(MBRegsToSTRING(PKRRegisters(AData)^,FHighByteFirst), FStrLen),async);
       MCT_ARRAY: begin
           FTmpArray.len:=Length(PKRRegisters(AData)^)*2;
           if FTmpArray.len-1=FArrayLen then dec(FTmpArray.len);
@@ -2489,17 +2478,17 @@ begin
             FTmpArray.buf[i*2]:=PKRRegisters(AData)^[i] shr 8;
             FTmpArray.buf[i*2+1]:=PKRRegisters(AData)^[i] and $FF;
           end;
-          UpdateValue_c(FTmpVal);
+          UpdateValueResponse(FTmpVal);
         end;
       end;
     except on E: Exception do begin
         DoRuntimeError('TKRMBRegister[Name="'+
           Name+'"] procedure _RCallBack;',E);
-        FError:=-mbmeRealTimeError;
-        DoError(false);
+        FError:=mbceRealTimeError;
+        DoError;
       end;
     end;
-  end else DoError(true);
+  end else DoError;
   FAUpdated:=true;
 //  if not FAUpdated then SetTimer(FWH, 1, 3, nil);
 end;
@@ -2510,7 +2499,7 @@ var
 begin
   if AError<>0 then begin
     FError:=AError;
-    DoError(false);
+    DoError;
     exit;
   end;
   if FStringLen>0 then begin
@@ -2525,27 +2514,27 @@ begin
     FStringLen:=FStringLen-2;
     Inc(FStringIndex);
     _mb.WriteHoldingRegister(_mbc.FMBType,_mbc.FAddres,FStringIndex,BytesToWord(bt0,bt1),_StrCallBack);
-  end else SetValue_c(FTmpVal)
+  end else SetValueResponse(FTmpVal)
 end;
 
 procedure TKRMBRegister._WCallBack(AError: integer; AData: Pointer);
 begin
   FError:=AError;
-  if AError=0 then SetValue_c(FTmpVal) else DoError(false);
+  if AError=0 then SetValueResponse(FTmpVal) else DoError;
 end;
 
 procedure TKRMBRegister._WCallBack0(AError: integer; AData: Pointer);
 begin
   FError:=AError;
   if AError=0 then _mb.WriteHoldingRegister(_mbc.FMBType,_mbc.FAddres,FIndex+1,FTmpWd0,_WCallBack)
-  else DoError(false);
+  else DoError;
 end;
 
 procedure TKRMBRegister._WCBUInt64_1(AError: integer; AData: Pointer);
 begin
   FError:=AError;
   if AError=0 then _mb.WriteHoldingRegister(_mbc.FMBType,_mbc.FAddres,FIndex+1,FTmpWd0,_WCBUInt64_2)
-  else DoError(false);
+  else DoError;
 end;
 
 procedure TKRMBRegister._WCBUInt64_2(AError: integer; AData: Pointer);
@@ -2559,14 +2548,226 @@ begin
     FTmpWD0:=(FTmpWD0 shr 8)or(FTmpWD0 shl 8);
   end;
   if AError=0 then _mb.WriteHoldingRegister(_mbc.FMBType,_mbc.FAddres,FIndex+2,wd0,_WCBUInt64_3)
-  else DoError(false);
+  else DoError;
 end;
 
 procedure TKRMBRegister._WCBUInt64_3(AError: integer; AData: Pointer);
 begin
   FError:=AError;
   if AError=0 then _mb.WriteHoldingRegister(_mbc.FMBType,_mbc.FAddres,FIndex+3,FTmpWd0,_WCallBack)
-  else DoError(false);
+  else DoError;
+end;
+
+{ TKRMBCBatchUpdates }
+
+constructor TKRMBCBatchUpdates.Create(AOwner: TComponent);
+begin
+  inherited Create(TKRMBCBatchUpdate);
+  FMBC:=TKRModbusClient(AOwner);
+end;
+
+function TKRMBCBatchUpdates.GetBUItem(Index: integer): TKRMBCBatchUpdate;
+begin
+  Result:=TKRMBCBatchUpdate(inherited Items[Index]);
+end;
+
+function TKRMBCBatchUpdates.GetOwner: TPersistent;
+begin
+  Result:=FMBC;
+end;
+
+procedure TKRMBCBatchUpdates.SetBUItem(Index: integer;
+  const Value: TKRMBCBatchUpdate);
+begin
+  TKRMBCBatchUpdate(inherited Items[Index]).Assign(Value);
+end;
+
+{ TKRMBCBatchUpdate }
+
+procedure TKRMBCBatchUpdate.AssignTo(Dest: TPersistent);
+begin
+  if Dest is TKRMBCBatchUpdate then begin
+    TKRMBCBatchUpdate(Dest).FIndex:=FIndex;
+    TKRMBCBatchUpdate(Dest).FCount:=FIndex;
+    TKRMBCBatchUpdate(Dest).FIntervalMin:=FIntervalMin;
+    TKRMBCBatchUpdate(Dest).FReadFunction:=FReadFunction;
+    TKRMBCBatchUpdate(Dest).UpdateReadPack;
+    TKRMBCBatchUpdate(Dest).Interval:=FInterval;
+  end;
+end;
+
+constructor TKRMBCBatchUpdate.Create(Collection: TCollection);
+begin
+  inherited Create(Collection);
+  FWH := AllocateHWnd(tmWP);
+  FRegsLen:=4;
+  SetLength(regs,FRegsLen);
+
+  FIndex:=0;
+  FCount:=1;
+  FInterval:=0;
+  FIntervalMin:=5;
+  FReadFunction:=mbrfReadHoldingRegisters;
+
+  UpdateReadPack;
+end;
+
+destructor TKRMBCBatchUpdate.Destroy;
+begin
+  KillTimer(FWH, 1);
+  DeallocateHWnd(FWH);
+
+  inherited;
+end;
+
+procedure TKRMBCBatchUpdate.MBCallBack(AError: integer; AData: Pointer);
+var
+  i, n, k, j, m: integer;
+  data: PKRRegisters;
+  reg: TKRMBRegister;
+  tm: cardinal;
+begin
+  if AError=0 then begin
+    data:=AData;
+    if Length(data^)=FCount then begin
+
+      n:=TKRMBCBatchUpdates(Collection).FMBC.ItemsCount-1;
+      for i := 0 to n do begin
+        reg:=TKRMBRegister(TKRMBCBatchUpdates(Collection).FMBC.Items[i]);
+        if(reg.FIndex<FIndex)or(reg.FIndex+reg.FCount>FIndex+FCount)then continue;
+        case reg.FMCVarType of
+          MCT_BYTE, MCT_WORD, MCT_SMALLINT:  begin
+            regs[0]:=data^[reg.FIndex-FIndex];
+            reg._RCallBack(-2147483648,@regs);
+          end;
+          MCT_DWORD, MCT_INT, MCT_SINGLE: begin
+            k:=reg.FIndex-FIndex;
+            regs[0]:=data^[k];
+            inc(k);
+            regs[1]:=data^[k];
+            reg._RCallBack(-2147483648,@regs);
+          end;
+          MCT_UINT64, MCT_INT64, MCT_DOUBLE: begin
+            k:=reg.FIndex-FIndex;
+            regs[0]:=data^[k];
+            inc(k);
+            regs[1]:=data^[k];
+            inc(k);
+            regs[2]:=data^[k];
+            inc(k);
+            regs[3]:=data^[k];
+            reg._RCallBack(-2147483648,@regs);
+          end;
+          MCT_STRING: begin
+            if FRegsLen<reg.FCount then begin
+              FRegsLen:=reg.FCount;
+              SetLength(regs,FRegsLen);
+            end;
+            k:=reg.FIndex-FIndex;
+            m:=reg.FCount-1;
+            for j := 0 to m do begin
+              regs[j]:=data^[k];
+              inc(k);
+            end;
+            reg._RCallBack(-2147483648,@regs);
+          end;
+        end;
+      end;
+
+    end else AError:=mbceNoValue;
+  end;
+  if AError<>0 then begin
+    n:=TKRMBCBatchUpdates(Collection).FMBC.ItemsCount-1;
+    for i := 0 to n do begin
+      reg:=TKRMBRegister(TKRMBCBatchUpdates(Collection).FMBC.Items[i]);
+      if(reg.FIndex<FIndex)or(reg.FIndex+reg.FCount>FIndex+FCount)then continue;
+      reg.FError:=AError;
+      reg.DoError(true);
+    end;
+  end;
+
+  if FInterval>0 then begin
+    tm:=getTickCount-FRequestTM;
+    if(tm>FInterval)or(FInterval-tm<FIntervalMin)then tm:=FIntervalMin else tm:=FInterval-tm;
+    SetTimer(FWH, 1, tm, nil);
+  end;
+end;
+
+procedure TKRMBCBatchUpdate.SetCount(const Value: Word);
+begin
+  FCount := Value;
+  UpdateReadPack;
+end;
+
+procedure TKRMBCBatchUpdate.SetInterval(const Value: Cardinal);
+begin
+  if FInterval<>Value then begin
+    KillTimer(FWH, 1);
+    FInterval := Value;
+    if (FInterval>0)then SetTimer(FWH, 1, FInterval, nil);
+  end;
+end;
+
+procedure TKRMBCBatchUpdate.SetReadFunction(const Value: TMBReadFunction);
+begin
+  FReadFunction := Value;
+  UpdateReadPack;
+end;
+
+procedure TKRMBCBatchUpdate.SetRegIndex(const Value: Word);
+begin
+  FIndex := Value;
+  UpdateReadPack;
+end;
+
+procedure TKRMBCBatchUpdate.TmWP(var Msg: TMessage);
+begin
+  if(Msg.Msg=WM_TIMER)and(Msg.WParam=1)then begin
+    KillTimer(FWH, 1);
+    if Assigned(Collection)and Assigned(TKRMBCBatchUpdates(Collection).FMBC.FModbus) then
+      if FReadPackLen=0 then begin
+        UpdateReadPack;
+        if FInterval>0 then SetTimer(FWH, 1, FInterval, nil);
+      end else begin
+        FRequestTM:=getTickCount;
+        TKRMBCBatchUpdates(Collection).FMBC.FModbus.SendPack(
+          TKRMBCBatchUpdates(Collection).FMBC.FMBType,
+          FReadPackFunc,
+          @FReadPack,
+          FReadPackLen,
+          MBCallBack,
+          FReadPackRLen
+        )
+      end
+    else if FInterval>0 then SetTimer(FWH, 1, FInterval, nil);
+  end else Msg.Result := DefWindowProc(FWH, Msg.Msg, Msg.wParam, Msg.lParam);
+end;
+
+procedure TKRMBCBatchUpdate.UpdateReadPack;
+begin
+  if Assigned(Collection)and Assigned(TKRMBCBatchUpdates(Collection).FMBC.FModbus) then begin
+    if FReadFunction=mbrfReadHoldingRegisters then begin
+      FReadPackLen:=TKRMBCBatchUpdates(Collection).FMBC.FModbus.ReadHoldingRegistersPack(
+        TKRMBCBatchUpdates(Collection).FMBC.FMBType,
+        TKRMBCBatchUpdates(Collection).FMBC.Addres,
+        FIndex,
+        FCount,
+        @FReadPack,
+        FReadPackRLen
+      );
+      FReadPackFunc:=mbfReadHoldingRegisters;
+    end else begin
+      FReadPackLen:=TKRMBCBatchUpdates(Collection).FMBC.FModbus.ReadInputRegistersPack(
+        TKRMBCBatchUpdates(Collection).FMBC.FMBType,
+        TKRMBCBatchUpdates(Collection).FMBC.Addres,
+        FIndex,
+        FCount,
+        @FReadPack,
+        FReadPackRLen
+      );
+      FReadPackFunc:=mbfReadInputRegisters;
+    end;
+  end else FReadPackLen:=0;
 end;
 
 end.

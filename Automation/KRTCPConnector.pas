@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRTCPConnector                                                            *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 17.03.2020                                                          *)
 (*  https://kandiral.ru/delphi/krtcpconnector.pas.html                        *)
 (*                                                                            *)
 (******************************************************************************)
@@ -18,7 +18,7 @@ uses
   {$ELSE}
     Windows, Classes, Forms, SysUtils,
   {$IFEND}
-  KRConnector, KRTCPSocketClient, KRThreadQueue;
+  KRConnectorLng, KRConnector, KRTCPSocketClient, KRTypes;
 
 type
   TKRTCPConnector = class;
@@ -27,12 +27,12 @@ type
   private
     FErrCntr: integer;
     FTCPClient: TKRTCPSocketClient;
+    tm: cardinal;
   protected
     procedure _exec; override;
-    procedure KRExecutePausedFirst; override;
+    procedure KRExecuteLast; override;
   public
-    constructor CreateTh(AConnector: TKRConnector; ATCPClient: TKRTCPSocketClient; AQueue: TKRThreadQueue;
-      AQueueOut: TKRThreadQueue);
+    constructor CreateTh(AConnector: TKRConnector; ATCPClient: TKRTCPSocketClient);
   end;
 
   TKRTCPConnector = class(TKRConnector)
@@ -40,21 +40,24 @@ type
     FTCPClient: TKRTCPSocketClient;
     FPort: Word;
     FIP: String;
-    procedure SetIP(const Value: String);
-    procedure SetPort(const Value: Word);
+    FReadTimeout: Cardinal;
+    FWriteTimeout: Cardinal;
+    FConnectTimeout: Cardinal;
   protected
     function GetConnected: boolean;override;
+    procedure CreateThread; override;
   public
     constructor Create(AOwner: TComponent);override;
     destructor Destroy;override;
   published
-    property IP: String read FIP write SetIP;
-    property Port: Word read FPort write SetPort;
+    property IP: String read FIP write FIP;
+    property Port: Word read FPort write FPort default 502;
+    property ConnectTimeout: Cardinal read FConnectTimeout write FConnectTimeout default 3000;
+    property WriteTimeout: Cardinal read FWriteTimeout write FWriteTimeout default 500;
+    property ReadTimeout: Cardinal read FReadTimeout write FReadTimeout default 500;
   end;
 
 implementation
-
-uses Funcs;
 
 { TKRTCPConnector }
 
@@ -63,23 +66,23 @@ begin
   inherited;
   FConnectorType:=ctTCPClient;
   FTCPClient:=TKRTCPSocketClient.Create;
-  FThread:=TKRTCPThread.CreateTh(Self,FTCPClient,FQueue,FQueueOut);
-  SetIP('10.0.6.11');
-  SetPort(502);
+  FConnectTimeout:=3000;
+  FWriteTimeout:=500;
+  FReadTimeout:=500;
+  FIP:='192.168.0.1';
+  FPort:=502;
+end;
+
+procedure TKRTCPConnector.CreateThread;
+begin
+  FThread:=TKRTCPThread.CreateTh(Self,FTCPClient);
+  inherited;
 end;
 
 destructor TKRTCPConnector.Destroy;
 begin
-  FThread.Terminate;
-  while FThread.Working do Application.ProcessMessages;
-  FThread.Free;
-  if FTCPClient.Connected then begin
-    try
-      FTCPClient.Close;
-    finally
-      FTCPClient.Free;
-    end;
-  end;
+  Active:=false;
+  FTCPClient.Free;
   inherited;
 end;
 
@@ -88,46 +91,15 @@ begin
   Result:=FTCPClient.Connected;
 end;
 
-procedure TKRTCPConnector.SetIP(const Value: String);
-var
-  b: boolean;
-begin
-  b:=FThread.Pause;
-  FThread.Pause:=true;
-  if not b then
-    while not FThread.Paused do Application.ProcessMessages;
-  FTCPClient.Close;
-  FTCPClient.Addr:=AnsiString(Value);
-  FIP:=Value;
-  FThread.Pause:=b;
-end;
-
-procedure TKRTCPConnector.SetPort(const Value: Word);
-var
-  b: boolean;
-begin
-  b:=FThread.Pause;
-  FThread.Pause:=true;
-  if not b then
-    while not FThread.Paused do Application.ProcessMessages;
-  FTCPClient.Close;
-  FTCPClient.Port:=Value;
-  FPort:=Value;
-  FThread.Pause:=b;
-end;
-
 { TKRTCPThread }
 
-constructor TKRTCPThread.CreateTh(AConnector: TKRConnector;
-  ATCPClient: TKRTCPSocketClient; AQueue, AQueueOut: TKRThreadQueue);
+constructor TKRTCPThread.CreateTh(AConnector: TKRConnector; ATCPClient: TKRTCPSocketClient);
 begin
-  FWaitRespTime:=5;
   FTCPClient:=ATCPClient;
-  FErrCntr:=0;
-  inherited CreateTh(AConnector, AQueue, AQueueOut);
+  inherited CreateTh(AConnector);
 end;
 
-procedure TKRTCPThread.KRExecutePausedFirst;
+procedure TKRTCPThread.KRExecuteLast;
 begin
   try
     if FTCPClient.Connected then FTCPClient.Close;
@@ -137,8 +109,8 @@ end;
 
 procedure TKRTCPThread._exec;
 var
-  n: integer;
-  tm{,tm0}: Cardinal;
+  n, rlen: cardinal;
+  bf: TKRBuffer;
 
   procedure _error(AErr: TKRConnectorError);
   begin
@@ -157,9 +129,10 @@ begin
   if not FTCPClient.Connected then begin
     if((getTickCount-FLastConnectTime)>FReconnectTime)then begin
       try
+        FTcpClient.Addr:=AnsiString(TKRTCPConnector(FConnector).FIP);
+        FTcpClient.Port:=TKRTCPConnector(FConnector).FPort;
         SetStat(cstConnecting);
-        FTcpClient.ConnectTimeout:=FConnectTimeout;
-        SetStat(cstConnecting);
+        FTcpClient.ConnectTimeout:=TKRTCPConnector(FConnector).FConnectTimeout;
         FTcpClient.Open;
       except on E: Exception do
         FConnector.DoRuntimeError('TKRTCPThread[FConnector.Name="'+
@@ -167,24 +140,39 @@ begin
       end;
       FLastConnectTime:=getTickCount;
     end;
-    if not FTCPClient.Connected then begin
+    if FTCPClient.Connected then begin
+      SetStat(cstConnected);
+      tm:=getTickCount;
+    end else begin
       SetStat(cstWaitReconnecting);
       FPk^.Error:=ceNotConnection;
       FPk^.Length:=0;
       DoCallBack;
       exit;
-    end else SetStat(cstConnected);
+    end;
     FErrCntr:=0;
   end;
 
-  tm:=0;
   FPk^.Error:=ceOK;
+
+  if FInterval>0 then begin
+    tm:=getTickCount-tm;
+    if tm<FInterval then sleep(FInterval-tm);
+  end;
+
+  try
+    while not FTCPClient.IsReadBufferEmpty do
+      FTCPClient.ReceiveBuf(bf,SizeOf(TKRBuffer));
+  except end;
 
   try
     SendPack;
-    tm:=getTickCount;
-    n:=FTCPClient.SendBuf(FPk^.Pack^,FPk^.Length);
-    if n<>FPk^.Length then _error(ceDataNotSended);
+
+    if FTCPClient.WaitForWrite(TKRTCPConnector(FConnector).FWriteTimeout) then begin
+      n:=FTCPClient.SendBuf(FPk^.Pack^,FPk^.Length);
+      if n<Cardinal(FPk^.Length) then _error(ceDataNotSended);
+    end else _error(ceRequestTimeout);
+
   except on E: Exception do begin
        FConnector.DoRuntimeError('TKRTCPThread[FConnector.Name="'+
          FConnector.Name+'"; procedure _exec; n:=FTCPClient.SendBuf(FPack.Pack^,FPack.Length);',E);
@@ -193,24 +181,25 @@ begin
   end;
 
   if FPk^.Error<>ceOK then begin
+    tm:=getTickCount;
     DoCallBack;
     exit;
   end;
 
   if FPk^.WaitResult then try
-    FTCPClient.WaitForData(FReadTimeout);
-    n:=FTCPClient.ReceiveBuf(FPk^.Pack^,255);
 
-    if n>0 then begin
-      Inc(FCounter);
-      FPk^.Length:=n;
-      FErrCntr:=0;
-      RecvPack;
-    end else begin
-      if((getTickCount-tm)>FWriteTimeout+FReadTimeout)then
-        _error(ceResponseTimeout)
-      else _error(ceNoResponse);
-    end
+    if FTCPClient.WaitForRead(TKRTCPConnector(FConnector).FReadTimeout) then begin
+
+      if FPk^.RLen>0 then rlen:=FPk^.RLen else rlen:=SizeOf(TKRBuffer);
+      n:=FTCPClient.ReceiveBuf(FPk^.Pack^,rlen);
+
+      if n>0 then begin
+        Inc(FCounter);
+        FPk^.Length:=n;
+        FErrCntr:=0;
+        RecvPack;
+      end else _error(ceNoResponse);
+    end else _error(ceResponseTimeout);
 
   except on E: Exception do begin
        FConnector.DoRuntimeError('TKRTCPThread[FConnector.Name="'+
@@ -219,6 +208,7 @@ begin
     end;
   end;
 
+  tm:=getTickCount;
   DoCallBack;
 
 end;

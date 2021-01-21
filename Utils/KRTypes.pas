@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRTypes                                                                   *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 02.01.2017                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -45,6 +45,7 @@ type
   end;
   PKRDrive = ^TKRDrive;
 
+  TKREmptyEvent = procedure of object;
 
 implementation
 

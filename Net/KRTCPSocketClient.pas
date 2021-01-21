@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRTCPSocketClient                                                         *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 16.09.2019                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -12,7 +12,13 @@ unit KRTCPSocketClient;
 
 interface
 
-uses KRSockets, JwaWinsock2;
+uses
+  {$IF CompilerVersion >= 23}
+    Winapi.Winsock2,
+  {$ELSE}
+    Winsock2,
+  {$IFEND}
+  KRSockets;
 
 type
   TKRTCPSocketClient = class(TKRSocketClient)
@@ -55,24 +61,24 @@ end;
 
 procedure TKRTCPSocketClient.GetLocalData;
 var
-  addr: sockaddr_in;
+  addr: TSockAddr;
   AddrSize: integer;
 begin
   FLocalAddr := '0.0.0.0';
   FLocalPort:=0;
   if Active and FConnected then begin
     AddrSize := SizeOf(Addr);
-    if ErrorCheck(JwaWinsock2.getsockname(FSocket, @addr, AddrSize))=0 then
-      if(Addr.sin_family=AF_INET)and(AddrSize=SizeOf(Addr)) then begin
-        FLocalAddr:=inet_ntoa(addr.sin_addr);
-        FLocalPort:=ntohs(addr.sin_port);
+    if ErrorCheck(getsockname(FSocket, addr, AddrSize))=0 then
+      if(TSockAddrIn(Addr).sin_family=AF_INET)and(AddrSize=SizeOf(Addr)) then begin
+        FLocalAddr:=inet_ntoa(TSockAddrIn(addr).sin_addr);
+        FLocalPort:=ntohs(TSockAddrIn(addr).sin_port);
       end;
   end;
 end;
 
 procedure TKRTCPSocketClient.Open;
 var
-  addr: sockaddr_in;
+  addr: TSockAddr;
   AddrSize: Cardinal;
   writeReady, exceptFlag: Boolean;
 begin
@@ -80,11 +86,11 @@ begin
   if Active and not FConnected then begin
     AddrSize := SizeOf(Addr);
     FillChar(Addr, AddrSize, 0);
-    addr.sin_family := AF_INET;
-    addr.sin_addr.s_addr := inet_addr(PAnsiChar(FAddr));
-    addr.sin_port := htons(FPort);
+    TSockAddrIn(addr).sin_family := AF_INET;
+    TSockAddrIn(addr).sin_addr.s_addr := inet_addr(PAnsiChar(FAddr));
+    TSockAddrIn(addr).sin_port := htons(FPort);
 
-    FConnected := ErrorCheck(JwaWinSock2.connect(FSocket, @addr, AddrSize)) = 0;
+    FConnected := ErrorCheck(connect(FSocket, addr, AddrSize)) = 0;
     if not FConnected then begin
       Select(FSocket, nil, @writeReady, @exceptFlag, FConnectTimeout);
       FConnected := writeReady and not exceptFlag;

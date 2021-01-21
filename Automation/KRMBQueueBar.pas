@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRMBQueueBar                                                              *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 15.04.2019                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -56,7 +56,7 @@ begin
   Height:=57;
   Width:=25;
   SetupInternalLabel;
-  inherited Max:=MB_QUEUE_MAX_ITEMS;
+  inherited Max:=MBM_QUEUE_MAX_ITEMS;
   Enabled:=false;
   BLabel.Position:=blpRightBottom;
 end;

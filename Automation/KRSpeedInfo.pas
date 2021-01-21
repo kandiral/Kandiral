@@ -14,11 +14,11 @@ interface
 
 uses
   {$IF CompilerVersion >= 23}
-    System.Classes, System.SysUtils, Vcl.StdCtrls, Vcl.Forms, Winapi.MMSystem,
+    Winapi.Windows, System.Classes, System.SysUtils, Vcl.StdCtrls, Vcl.Forms,
   {$ELSE}
-    Classes, SysUtils, StdCtrls, Forms, MMSystem,
+    Windows, Classes, SysUtils, StdCtrls, Forms,
   {$IFEND}
-  KRTimer, KRNormalArray, Funcs;
+  KRTimer, KRNormalArray;
 
 type
   IKRSpeedInfo = interface
@@ -142,9 +142,9 @@ begin
       ssMinute: k:=60000;
       ssHour: k:=3600000;
     end;
-    _spd:=_rz/(funcs.ElapsedTime(FOldDt)/k);
+    _spd:=_rz/((getTickCount-FOldDt)/k);
     FOldCounter:=_cntr;
-    FOldDT:={$IF CompilerVersion >= 23}Winapi.{$IFEND}MMSystem.timeGetTime;
+    FOldDT:=getTickCount;
   end;
   if FFormat<>'' then s:=FormatFloat(FFormat,_spd) else s:=FloatToStr(_spd);
   if FAverageSpeed>0 then begin
@@ -183,7 +183,7 @@ begin
         FComponent:=Value;
         TComponent(FComponent).FreeNotification(Self);
         FOldCounter:=FComponent.GetCounter;
-        FOldDT:={$IF CompilerVersion >= 23}Winapi.{$IFEND}MMSystem.timeGetTime;
+        FOldDT:=getTickCount;
         FNrmArray.Clear;
     end else FComponent:=nil;
   end;

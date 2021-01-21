@@ -30,13 +30,15 @@ $(KANDIRAL)\dfm
 
 In the "Browsing path" add paths:
 ```bash
-$(KANDIRAL)\Common
 $(KANDIRAL)\Automation
+$(KANDIRAL)\Common
+$(KANDIRAL)\Crypting
 $(KANDIRAL)\File
+$(KANDIRAL)\Graphics
+$(KANDIRAL)\ISO
 $(KANDIRAL)\Media
 $(KANDIRAL)\Net
 $(KANDIRAL)\Utils
-$(KANDIRAL)\Graphics
 $(KANDIRAL)\Web
 ```
 Open one group of projects corresponding to your version of Delphi. The name of the project group file is "Kandiral150.groupproj". Where 150 is the [Package Version](http://docwiki.embarcadero.com/RADStudio/Seattle/en/Compiler_Versions)

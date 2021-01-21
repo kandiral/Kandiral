@@ -18,7 +18,7 @@ uses
   {$ELSE}
     Classes, SysUtils,
   {$IFEND}
-    KRTypes, KRModbus, lgop, KRCRC;
+    KRTypes, KRModbus, KRCRC, lgop;
 
   //------ Modbus Slave Responses ---------------------------------------------
   function MBSReadHoldingRegisters(AAddr: byte; AData: TKRRegisters;

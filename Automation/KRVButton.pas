@@ -19,7 +19,7 @@ uses
   {$ELSE}
     Windows, Classes, SysUtils, StdCtrls, Controls, Messages, MMSystem,
   {$IFEND}
-  KRIndicator, KRTypes, KRVariables;
+  KRIndicator, KRTypes, KRVariables, KRLogical, KRMsgBox;
 
 type
   TKRVBAType = (vbatSetBit, vbatSetValue, vbatSetValueAftZero, vbatClearBit,
@@ -204,8 +204,6 @@ type
 
 implementation
 
-uses funcs, lgop;
-
 { TKRVButton }
 
 constructor TKRVButton.Create(AOvner: TComponent);
@@ -274,12 +272,12 @@ begin
       vbsWaitForBit: begin
         FStat:=vbsNone;
         case FAction of
-        vbatSetBit: FVariable.Value:=SetBit(FVariable.Value,FBit);
-        vbatClearBit: FVariable.Value:=ClearBit(FVariable.Value,FBit);
-        vbatTggleBit: if GetBit(FVariable.Value,FBit) then
-            FVariable.Value:=ClearBit(FVariable.Value,FBit)
+        vbatSetBit: FVariable.Value:=KRSetBit32(FVariable.Value,FBit);
+        vbatClearBit: FVariable.Value:=KRClearBit32(FVariable.Value,FBit);
+        vbatTggleBit: if KRGetBit32(FVariable.Value,FBit) then
+            FVariable.Value:=KRClearBit32(FVariable.Value,FBit)
           else
-            FVariable.Value:=SetBit(FVariable.Value,FBit);
+            FVariable.Value:=KRSetBit32(FVariable.Value,FBit);
         end;
       end;
       vbsWaitForValue: begin
@@ -293,7 +291,7 @@ end;
 procedure TKRVButton._Click(Sender: TObject);
 begin
   if Trim(FAskMsg)<>'' then
-    if IDYES<>AppMsgBox(FAskMsg,MB_YESNOCANCEL or MB_DEFBUTTON3 or KRDialogTypeToFlag(FDialogType))then exit;
+    if IDYES<>KRAppMsgBox(FAskMsg,MB_YESNOCANCEL or MB_DEFBUTTON3 or KRDialogTypeToFlag(FDialogType))then exit;
 
   if Assigned(FClick) then FClick(Self);
 

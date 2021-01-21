@@ -70,6 +70,12 @@ contains
   KRMBMon in '..\..\Automation\KRMBMon.pas',
   KRVCheckGroupBox in '..\..\Automation\KRVCheckGroupBox.pas',
   KRAsyncComPort in '..\..\Automation\KRAsyncComPort.pas',
-  KRMBRegs in '..\..\Automation\KRMBRegs.pas';
+  KRMBRegs in '..\..\Automation\KRMBRegs.pas',
+  KRConnectorLng in '..\..\Automation\KRConnectorLng.pas',
+  KRModbusLng in '..\..\Automation\KRModbusLng.pas',
+  KRModbusMasterLng in '..\..\Automation\KRModbusMasterLng.pas',
+  KRModbusClientLng in '..\..\Automation\KRModbusClientLng.pas',
+  KRFieldLng in '..\..\Automation\KRFieldLng.pas',
+  KRCOMPortSetsLng in '..\..\Automation\KRCOMPortSetsLng.pas';
 
 end.

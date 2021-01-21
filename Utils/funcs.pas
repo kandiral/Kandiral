@@ -89,8 +89,27 @@ type
   function ChangeFileDate(Dir: string; ALastAccessTime, ACreationTime, ALastWriteTime: TDateTime): boolean;overload;
   function ReadFileDate(Dir: string; var ALastAccessTime, ACreationTime, ALastWriteTime: {$IF CompilerVersion >= 23}Winapi.{$IFEND}Windows._FILETIME): boolean;overload;
   function LSwap(c:cardinal):cardinal;
+  function TzSpecificLocalTimeToSystemTime(lpTimeZoneInformation: PTimeZoneInformation; var lpLocalTime, lpUniversalTime: TSystemTime): BOOL; stdcall;
+  function SystemTimeToTzSpecificLocalTime(lpTimeZoneInformation: PTimeZoneInformation; var lpUniversalTime,lpLocalTime: TSystemTime): BOOL; stdcall;
+  function FastHexCharToVal(ACh: Char): byte;
+  function FastValToHexChar(AVal: Byte): Char;
 
 implementation
+
+function TzSpecificLocalTimeToSystemTime; external kernel32 name 'TzSpecificLocalTimeToSystemTime';
+function SystemTimeToTzSpecificLocalTime; external kernel32 name 'SystemTimeToTzSpecificLocalTime';
+
+function FastHexCharToVal(ACh: Char): byte;
+var bt: byte;
+begin
+  bt:=Ord(ACh);
+  if bt>57 then Result:=bt-55 else Result:=bt-48;
+end;
+
+function FastValToHexChar(AVal: Byte): Char;
+begin
+  if AVal>9 then Result:=Chr(AVal+55) else Result:=Chr(AVal+48)
+end;
 
 function CryptString(Const  Input: string; password : AnsiString;  Encrypt: Boolean) : string;
 const

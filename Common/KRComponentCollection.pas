@@ -20,8 +20,6 @@ uses
   {$IFEND}
     ;
 
-
-
 type
   TKRComponentCollection = class;
 
@@ -45,7 +43,6 @@ type
   private
     FItems: TList;
     FItemClass: TKRComponentCollectionItemClass;
-    FParentComponent: TComponent;
     function GetItemsCount: Integer;
   protected
     function GetItem(Index: integer): TKRComponentCollectionItem;
@@ -63,20 +60,10 @@ type
     property ItemClass: TKRComponentCollectionItemClass read FItemClass;
     procedure SetChildOrder(Child: TComponent; Order: Integer); override;
     procedure GetChildren(Proc: TGetChildProc; Root: TComponent); override;
-    function GetParentComponent: TComponent; override;
-    procedure SetParentComponent(AParent: TComponent);override;
-    procedure SetParentComponent_(AParent: TComponent);
-    function HasParent: Boolean; override;
     procedure AddItem(AItem: TKRComponentCollectionItem);
     procedure RemoveItem(AItem: TKRComponentCollectionItem);
     property Items[Index: integer]: TKRComponentCollectionItem read GetItem write SetItem; default;
     property ItemsCount: Integer read GetItemsCount;
-  end;
-
-  TKRComponent = class(TKRComponentCollection)
-  public
-    constructor Create(AOwner: TComponent);override;
-    destructor Destroy;override;
   end;
 
 implementation
@@ -92,27 +79,13 @@ begin
   AftAddItem(AItem);
 end;
 
-procedure TKRComponentCollection.AftAddItem(
-  var AItem: TKRComponentCollectionItem);
-begin
+procedure TKRComponentCollection.AftAddItem(var AItem: TKRComponentCollectionItem); begin end;
 
-end;
+procedure TKRComponentCollection.AftRemItem; begin end;
 
-procedure TKRComponentCollection.AftRemItem;
-begin
+procedure TKRComponentCollection.BfrAddItem; begin end;
 
-end;
-
-procedure TKRComponentCollection.BfrAddItem;
-begin
-
-end;
-
-procedure TKRComponentCollection.BfrRemItem(
-  var AItem: TKRComponentCollectionItem);
-begin
-
-end;
+procedure TKRComponentCollection.BfrRemItem(var AItem: TKRComponentCollectionItem); begin end;
 
 constructor TKRComponentCollection.Create(AOwner: TComponent);
 begin
@@ -141,8 +114,7 @@ begin
   end;
 end;
 
-function TKRComponentCollection.GetItem(
-  Index: integer): TKRComponentCollectionItem;
+function TKRComponentCollection.GetItem(Index: integer): TKRComponentCollectionItem;
 begin
   Result := TKRComponentCollectionItem(FItems[Index]);
 end;
@@ -152,27 +124,14 @@ begin
   Result:=FItems.Count;
 end;
 
-function TKRComponentCollection.GetParentComponent: TComponent;
-begin
-  if Assigned(FParentComponent) then
-    Result := FParentComponent else
-    Result := inherited GetParentComponent;
-end;
-
-function TKRComponentCollection.HasParent: Boolean;
-begin
-  if Assigned(FParentComponent) then
-    Result := True else
-    Result := inherited HasParent;
-end;
-
 procedure TKRComponentCollection.Notification(AComponent: TComponent;
   Operation: TOperation);
 begin
   inherited Notification(AComponent, Operation);
   if Operation = opRemove then
-    if (FItems <> nil) and (AComponent is TKRComponentCollectionItem) then
+    if (FItems <> nil) and (AComponent is TKRComponentCollectionItem) then begin
       RemoveItem(TKRComponentCollectionItem(AComponent));
+    end;
 end;
 
 procedure TKRComponentCollection.RemoveItem(AItem: TKRComponentCollectionItem);
@@ -202,16 +161,6 @@ procedure TKRComponentCollection.SetItemClass(
   AItemClass: TKRComponentCollectionItemClass);
 begin
   FItemClass:=AItemClass;
-end;
-
-procedure TKRComponentCollection.SetParentComponent(AParent: TComponent);
-begin
-//  TKRComponent(AParent).SetCollection(Self);
-end;
-
-procedure TKRComponentCollection.SetParentComponent_(AParent: TComponent);
-begin
-  FParentComponent:=AParent;
 end;
 
 { TKRComponentCollectionItem }
@@ -267,20 +216,6 @@ procedure TKRComponentCollectionItem.SetParentComponent(AParent: TComponent);
 begin
   if (AParent is TKRComponentCollection) then
     TKRComponentCollection(AParent).AddItem(Self);
-end;
-
-{ TKRComponent }
-
-constructor TKRComponent.Create(AOwner: TComponent);
-begin
-  inherited;
-
-end;
-
-destructor TKRComponent.Destroy;
-begin
-
-  inherited;
 end;
 
 end.

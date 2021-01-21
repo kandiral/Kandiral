@@ -14,11 +14,10 @@ interface
 
 uses
   {$IF CompilerVersion >= 23}
-    System.SysUtils, System.Classes, System.Types,
+    Winapi.Winsock2, System.SysUtils, System.Classes, System.Types;
   {$ELSE}
-    SysUtils, Classes, Types,
+    Winsock2, SysUtils, Classes, Types;
   {$IFEND}
-  JwaWinsock2;
 
 type
   EKRSocketError = class(Exception);
@@ -61,10 +60,12 @@ type
     function SendBuf(var Buf; BufSize: Integer; Flags: Integer = 0): Integer;
     function SendBufTo(var AFrom: TSockAddr; var Buf; BufSize: Integer; Flags: Integer = 0): Integer;
     function WaitForData(ATimeOut: Integer = 0): Boolean;
+    function WaitForRead(ATimeOut: Integer = 0): Boolean;
     function WaitForWrite(ATimeOut: Integer = 0): Boolean;
     function WaitForDataFrom(var AFrom: TSockAddr; ATimeOut: Integer = 0): Boolean;
     function ReceiveBuf(var Buf; BufSize: Integer; Flags: Integer = 0): Integer;
     function ReceiveBufFrom(var AFrom: TSockAddr; var Buf; BufSize: Integer; Flags: Integer = 0): Integer;
+    function IsReadBufferEmpty: boolean;
   end;
 
   TKRSocketServer = class;
@@ -211,7 +212,12 @@ begin
     Timeptr := @tv;
   end else Timeptr := nil;
   try
-    Result := JwaWinSock2.select(ASocket + 1, ReadFdsptr, WriteFdsptr, ExceptFdsptr, Timeptr) > 0;
+    Result := {$IF CompilerVersion >= 23}Winapi.{$IFEND}Winsock2.select(
+      ASocket + 1,
+      ReadFdsptr,
+      WriteFdsptr,
+      ExceptFdsptr,
+      Timeptr) > 0;
   except
     Result := False;
   end;
@@ -238,6 +244,13 @@ begin
   FConnected := false;
 end;
 
+function TKRSocketClient.IsReadBufferEmpty: boolean;
+var
+  DataByte: Byte;
+begin
+  Result:=recv(FSocket, DataByte, 1, MSG_PEEK) <> 1;
+end;
+
 procedure TKRSocketClient.Open;
 begin
   inherited Open;
@@ -254,7 +267,7 @@ var
   i: integer;
 begin
   i:=SizeOf(AFrom);
-  Result := ErrorCheck(recvfrom(FSocket, Buf, BufSize, Flags, @AFrom, i));
+  Result := ErrorCheck(recvfrom(FSocket, Buf, BufSize, Flags, AFrom, i));
 end;
 
 function TKRSocketClient.SendBuf(var Buf; BufSize, Flags: Integer): Integer;
@@ -293,7 +306,16 @@ begin
   i:=SizeOf(AFrom);
   if Select(FSocket, @ReadReady, nil, @ExceptFlag, ATimeOut) then
     Result := ReadReady and not ExceptFlag and
-    (ErrorCheck(recvfrom(FSocket, DataByte, 1, MSG_PEEK, @AFrom, i))= 1);
+    (ErrorCheck(recvfrom(FSocket, DataByte, 1, MSG_PEEK, AFrom, i))= 1);
+end;
+
+function TKRSocketClient.WaitForRead(ATimeOut: Integer): Boolean;
+var
+  ReadReady, ExceptFlag: Boolean;
+begin
+  Result := False;
+  if Select(FSocket, @ReadReady, nil, @ExceptFlag, ATimeOut) then
+    Result := ReadReady and not ExceptFlag;
 end;
 
 function TKRSocketClient.WaitForWrite(ATimeOut: Integer): Boolean;

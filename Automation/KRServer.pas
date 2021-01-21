@@ -14,11 +14,11 @@ interface
 
 uses
   {$IF CompilerVersion >= 23}
-    System.Classes, Winapi.MMSystem, System.SysUtils, Vcl.Forms,
+    Winapi.Windows, System.Classes, System.SysUtils, Vcl.Forms,
   {$ELSE}
-    Classes, MMSystem, SysUtils, Forms,
+    Windows, Classes, SysUtils, Forms,
   {$IFEND}
-  KRTypes, KRRuntimeErrors, KRThread, KRSockets, Funcs;
+  KRTypes, KRRuntimeErrors, KRThread, KRSockets;
 
 type
   TKRServerEvent = procedure(Sender: TObject; APack: PKRBuffer; var ALength: integer) of Object;
@@ -242,9 +242,9 @@ begin
   FMainServer:=AServer;
   FEvent:=nil;
   FReconnectTime:=5000;
-  FLastConnectTime:=timeGetTime-FReconnectTime-1;
+  FLastConnectTime:=getTickCount-FReconnectTime-1;
   FCheckClientsTime:=30000;
-  FLastCheckClientsTime:=timeGetTime;
+  FLastCheckClientsTime:=getTickCount;
   FWaitRespTime:=35;
   FWaitClientTimeout:=30000;
   inherited Create;
@@ -263,14 +263,14 @@ var
   List: TList;
 begin
   if not FMainServer.FServer.Connected then begin
-    if(ElapsedTime(FLastConnectTime)>FReconnectTime)then begin
+    if((getTickCount-FLastConnectTime)>FReconnectTime)then begin
       try
         FMainServer.FServer.Open;
       except on E: Exception do
         FMainServer.DoRuntimeError('TKRTCPIPServerThread[FMainServer.Name="'+
           FMainServer.Name+'"; procedure KRExecute; FServer.Open;',E);
       end;
-      FLastConnectTime:=timeGetTime;
+      FLastConnectTime:=getTickCount;
     end;
     exit;
   end;
@@ -281,7 +281,7 @@ begin
     client_t.Active:=true;
     FMainServer.FClients.Add(client_t);
   end else begin
-    if(ElapsedTime(FLastCheckClientsTime)>FCheckClientsTime)then begin
+    if((getTickCount-FLastCheckClientsTime)>FCheckClientsTime)then begin
       i:=0;
       List:=FMainServer.FClients.LockList;
       while i<List.Count do begin
@@ -292,7 +292,7 @@ begin
         end else inc(i);
       end;
       FMainServer.FClients.UnlockList;
-      FLastCheckClientsTime:=timeGetTime;
+      FLastCheckClientsTime:=getTickCount;
     end;
   end;
 end;
@@ -331,7 +331,7 @@ begin
   FServerThread:=AServerThread;
   FClient:=AClient;
   FTimeout:=FServerThread.FWaitClientTimeout;
-  FLastDataTime:=timeGetTime;
+  FLastDataTime:=getTickCount;
   UseProcessMessages:=false;
   inherited Create;
 end;
@@ -355,9 +355,9 @@ begin
       FClient.SendBuf(buf,n);
       SendPack(@buf,n);
     end;
-    FLastDataTime:=timeGetTime;
+    FLastDataTime:=getTickCount;
   end else begin
-    if(ElapsedTime(FLastDataTime)>FTimeout)then begin
+    if((getTickCount-FLastDataTime)>FTimeout)then begin
       FClient.Close;
       Pause:=true;
     end;

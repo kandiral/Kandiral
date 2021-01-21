@@ -4,6 +4,6 @@
     <Transaction>1899.12.30 00:00:00.000.023,C:\Users\kandiral\Documents\Embarcadero\Studio\Projects\ProjectGroup1.groupproj=X:\Components\Kandiral\Kandiral260.groupproj</Transaction>
   </Transactions>
 	<Default.Personality>
-		<Projects ActiveProject="X:\Components\Kandiral\packages\d260\KRWeb.dproj"/>
+		<Projects ActiveProject="X:\Components\Kandiral\packages\d260\KRAutomation.dproj"/>
 	</Default.Personality>
 </BorlandProject>

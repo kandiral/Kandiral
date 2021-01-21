@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRWindows                                                                 *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 04.04.2019                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -22,6 +22,16 @@ uses
 
 const
   KRCmdTOErrMsg = 'Превышен интервал ожидания.';
+
+type
+  // https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/using-ntstatus-values
+  TKRNTStatus = (KR_NT_SUCCESS, KR_NT_INFORMATION, KR_NT_WARNING, KR_NT_ERROR);
+
+  //https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/using-ntstatus-values
+  function KRCheckNTStatus(Status: Cardinal): TKRNTStatus;
+  procedure KRRaiseNTWarning(Status: Cardinal);
+  procedure KRRaiseNTError(Status: Cardinal);
+
 
   procedure KRGetDriveInfo(ADrive: Char; ADriveInfo: PKRDrive);
   function KRGetSpecialFolderPath(AFolder: Integer; ACanCreate: Boolean): string;
@@ -49,7 +59,23 @@ const
 
 implementation
 
-uses Funcs;
+function KRCheckNTStatus(Status: Cardinal): TKRNTStatus;
+begin
+  if Status>=$C0000000 then Result:=KR_NT_ERROR
+  else if Status>=$80000000 then Result:=KR_NT_INFORMATION
+  else if Status>=$40000000 then Result:=KR_NT_WARNING
+  else Result:=KR_NT_SUCCESS
+end;
+
+procedure KRRaiseNTWarning(Status: Cardinal);
+begin
+  if KRCheckNTStatus(Status)>KR_NT_INFORMATION then RaiseLastOSError;
+end;
+
+procedure KRRaiseNTError(Status: Cardinal);
+begin
+  if KRCheckNTStatus(Status)=KR_NT_ERROR then RaiseLastOSError;
+end;
 
 function KRGetFileSize(const AFileName: string): int64;
 var
@@ -359,7 +385,7 @@ begin
       if Assigned(Application) then Application.ProcessMessages else Sleep(20);
     until false;
     if isOem then OemToAnsi(PAnsiChar(StdOutput),PAnsiChar(StdOutput));
-    AStdOut:=AStdOut+StringToWideString(StdOutput,1251);
+    AStdOut:=AStdOut+String(StdOutput);
     StdErrors:='';
     repeat
       BytesRes:= 0;
@@ -371,7 +397,7 @@ begin
       if Assigned(Application) then Application.ProcessMessages else Sleep(20);
     until false;
     if isOem then OemToAnsi(PAnsiChar(StdErrors),PAnsiChar(StdErrors));
-    AStdErr:=AStdErr+StringToWideString(StdErrors,1251);
+    AStdErr:=AStdErr+String(StdErrors);
     if i = WAIT_OBJECT_0 then break;
     if(ATimeout>0)and((Now-TmStart)*SecsPerDay>ATimeout)then break;
   until false;

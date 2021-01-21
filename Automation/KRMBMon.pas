@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRMBMon                                                                   *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 30.07.2019                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -20,7 +20,7 @@ uses
     Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
     Dialogs, StdCtrls, ExtCtrls,
   {$IFEND}
-  KRTypes, funcs, KRValueEdit, KRModbusMaster, KRConnector;
+  KRTypes, KRValueEdit, KRModbusMaster, KRConnector, funcs;
 
 type
   TKRMBMon = class;
@@ -38,8 +38,6 @@ type
     procedure btnSaveLogClick(Sender: TObject);
     procedure chOnOffClick(Sender: TObject);
     procedure Button1Click(Sender: TObject);
-  protected
-    procedure CreateParams(var Params: TCreateParams);override;
   private
     FMon: TKRMBMon;
     KRBLValueEdit1: TKRBLValueEdit;
@@ -47,6 +45,8 @@ type
     filtring: boolean;
     procedure send(Sender: TObject; APack: PKRBuffer; ALength: integer);
     procedure recv(Sender: TObject; APack: PKRBuffer; ALength: integer);
+  protected
+    procedure CreateParams(var Params: TCreateParams);override;
     procedure DoHide; override;
     procedure DoShow; override;
   public
@@ -161,8 +161,6 @@ end;
 procedure TKRMBMonForm.DoHide;
 begin
   if Assigned(FMon.FModbusMaster) and Assigned(FMon.FModbusMaster.Connector) then begin
-    FMon.send:=FMon.FModbusMaster.Connector.OnSendAsync;
-    FMon.recv:=FMon.FModbusMaster.Connector.OnRecvAsync;
     FMon.FModbusMaster.Connector.OnSendAsync:=FMon.send;
     FMon.FModbusMaster.Connector.OnRecvAsync:=FMon.recv;
   end;
@@ -173,6 +171,8 @@ begin
   chOnOff.Checked:=false;
   btnSaveLog.Enabled:=true;
   if Assigned(FMon.FModbusMaster) and Assigned(FMon.FModbusMaster.Connector) then begin
+    FMon.send:=FMon.FModbusMaster.Connector.OnSendAsync;
+    FMon.recv:=FMon.FModbusMaster.Connector.OnRecvAsync;
     FMon.FModbusMaster.Connector.OnSendAsync:=send;
     FMon.FModbusMaster.Connector.OnRecvAsync:=recv;
   end;
@@ -193,7 +193,7 @@ begin
   txt:=(ALength>3)and(pch[0]=#58)and(pch[ALength-2]=#13)and(pch[ALength-1]=#10);
   if txt then begin
     s:='';
-    for I := 0 to ALength-1 do s:=s+pch[i];
+    for I := 0 to ALength-1 do s:=s+Char(pch[i]);
   end;
 
   if txt then AddLog('RECV: '+s)
@@ -214,7 +214,7 @@ begin
   txt:=(ALength>3)and(pch[0]=#58)and(pch[ALength-2]=#13)and(pch[ALength-1]=#10);
   if txt then begin
     s:='';
-    for I := 0 to ALength-1 do s:=s+pch[i];
+    for I := 0 to ALength-1 do s:=s+Char(pch[i]);
   end;
 
   if(ALength>4)and(KRBLValueEdit1.Value>0)then begin

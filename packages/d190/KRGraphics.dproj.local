@@ -1,10 +1,10 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <BorlandProject>
 	<Transactions>
-    <Transaction>1899.12.30 00:00:00.000.482,=KRCommon.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.211,C:\Users\kandiral\Documents\RAD Studio\Projects\Package1.dproj=X:\Components\Kandiral\packages\d190\KRGraphics.dproj</Transaction>
     <Transaction>1899.12.30 00:00:00.000.463,=X:\Components\Kandiral\Graphics\KRPenStyle.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.211,X:\Components\Kandiral\packages\d190\KRGraphics.dproj=C:\Users\kandiral\Documents\RAD Studio\Projects\Package1.dproj</Transaction>
     <Transaction>1899.12.30 00:00:00.000.507,=designide.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.482,=KRCommon.dcp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.486,=X:\Components\Kandiral\Graphics\KRPenWidth.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.777,=rtl.dcp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.430,=X:\Components\Kandiral\Graphics\KRColorBox.pas</Transaction>

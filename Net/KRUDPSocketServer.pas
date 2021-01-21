@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRUDPSocketServer                                                         *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 16.09.2019                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -12,7 +12,13 @@ unit KRUDPSocketServer;
 
 interface
 
-uses KRSockets, JwaWinsock2;
+uses
+  {$IF CompilerVersion >= 23}
+    Winapi.Winsock2,
+  {$ELSE}
+    Winsock2,
+  {$IFEND}
+  KRSockets;
 
 type
   TKRUDPSocketServer = class(TKRSocketClient)
@@ -42,21 +48,21 @@ end;
 
 procedure TKRUDPSocketServer.Open;
 var
-  addr: sockaddr_in;
+  addr: TSockAddr;
   AddrSize: Cardinal;
 begin
   inherited;
   if Active and not FConnected then begin
     AddrSize := SizeOf(Addr);
     FillChar(Addr, AddrSize, 0);
-    addr.sin_family := AF_INET;
+    TSockAddrIn(addr).sin_family := AF_INET;
     if FAddr='' then
-      addr.sin_addr.s_addr := htonl(INADDR_ANY)
+      TSockAddrIn(addr).sin_addr.s_addr := htonl(INADDR_ANY)
     else
-      addr.sin_addr.s_addr := inet_addr(PAnsiChar(FAddr));
-    addr.sin_port := htons(FPort);
+      TSockAddrIn(addr).sin_addr.s_addr := inet_addr(PAnsiChar(FAddr));
+    TSockAddrIn(addr).sin_port := htons(FPort);
 
-    if ErrorCheck(JwaWinSock2.bind(FSocket, @addr, sizeof(addr))) = 0 then
+    if ErrorCheck(bind(FSocket, addr, sizeof(addr))) = 0 then
       FConnected:=true;
   end;
 end;

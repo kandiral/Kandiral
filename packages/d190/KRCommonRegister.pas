@@ -43,6 +43,12 @@ type
       var Continue: Boolean); override;
   end;
 
+  TKRIniCfgParamEditor = class(TDefaultEditor)
+  protected
+    procedure EditProperty(const PropertyEditor: IProperty;
+      var Continue: Boolean); override;
+  end;
+
 procedure Register;
 
 implementation
@@ -69,7 +75,7 @@ procedure Register;
 begin
   ForceDemandLoadState(dlDisable);
   RegisterSplashScreen;
-  RegisterClasses([TKRComponent, TKRComponentCollection, TKRComponentCollectionItem,
+  RegisterClasses([TKRComponentCollection, TKRComponentCollectionItem,
     TKRBoundLabel, TKRIniConfig, TKRIniCfgParam, TKRProgressBar, TKRValueEdit,
     TKRBLValueEdit, TKRComboBox, TKRBLComboBox, TKRCheckBox, TKRBLCheckBox,
     TKRTimer, TKRCheckGroupBox, TKRRadioButton, TKRListView, TKRImageList,
@@ -183,6 +189,14 @@ procedure TKRTimerEditor.EditProperty(const PropertyEditor: IProperty;
   var Continue: Boolean);
 begin
   if CompareText(PropertyEditor.GetName, 'OnTimer') = 0 then inherited;
+end;
+
+{ TKRIniCfgParamEditor }
+
+procedure TKRIniCfgParamEditor.EditProperty(const PropertyEditor: IProperty;
+  var Continue: Boolean);
+begin
+  if CompareText(PropertyEditor.GetName, 'OnChange') = 0 then inherited;
 end;
 
 end.

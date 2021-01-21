@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRAsyncComPort                                                            *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 16.11.2019                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -481,7 +481,7 @@ begin
   FComPort := AComPort;
   Priority := FComPort.EventThreadPriority;
   SetCommMask(FComPort.Handle, EventsToInt(FComPort.Events));
-  Resume;
+  Start;
 end;
 
 destructor TKRACPThread.Destroy;
@@ -517,7 +517,6 @@ end;
 procedure TKRACPThread.Stop;
 begin
   SetEvent(FStopEvent);
-  Sleep(0);
 end;
 
 procedure TKRACPThread.DoEvents;

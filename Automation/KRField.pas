@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRField                                                                   *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 09.10.2019                                                          *)
 (*  https://kandiral.ru/delphi/krfield.pas.html                               *)
 (*                                                                            *)
 (******************************************************************************)
@@ -16,19 +16,21 @@ uses
   {$IF CompilerVersion >= 23}
     Winapi.Windows, System.Classes, System.Variants, Vcl.Controls, Vcl.ExtCtrls,
     Vcl.StdCtrls, Vcl.Graphics, System.SysUtils, Winapi.Messages, Vcl.Forms, System.Math,
+    System.StrUtils,
   {$ELSE}
     Windows, Classes, Variants, Controls, ExtCtrls, StdCtrls, Graphics, SysUtils,
-    Messages, Forms, Math,
+    Messages, Forms, Math, StrUtils,
   {$IFEND}
-  KRBoundLabel, StrUtils, KRVariables, KRTimer;
+  KRFieldLng, KRTypes, KRBoundLabel, KRVariables, KRMsgBox, KRDateTime, KRVariants;
 
 type
   TKRFieldDateTime = (fdtNone, fdtTime, fdtDate, fdtDateTime);
   TKRFieldValueEvent = procedure (Sender: TObject; var AValue: Variant) of object;
 
-  TKRField = class(TCustomEdit, IKRTimer)
+  TKRField = class(TCustomEdit, IKRVarUp)
   private
     FVariable: TKRVariable;
+    curval: Variant;
     FHint: String;
     FColor: TColor;
     FFormat: String;
@@ -48,14 +50,17 @@ type
     FDateTime: TKRFieldDateTime;
     FVarSet: TKRVariable;
     FSkipUserError: boolean;
-    FTimer: TKRTimer;
     FOldValue: Variant;
-    FOldChange: boolean;
     FOldError: integer;
     FEnterAftExit: boolean;
     FShowValue: TKRFieldValueEvent;
     FValType: TVarType;
     FSetValue: TKRFieldValueEvent;
+    FOutFunction: TKREmptyEvent;
+    FMsgMaximumLimit: String;
+    FMsgMinimumLimit: String;
+    FMsgAskBeforeInput: String;
+    FMsgIncorrectValue: String;
     procedure SetVariable(const Value: TKRVariable);
     procedure SetColor(const Value: TColor);
     procedure SetHint(const Value: String);
@@ -76,12 +81,38 @@ type
     procedure DoClick(Sender: TObject);
     procedure SetFontColor(const Value: TColor);
     procedure SetVarSet(const Value: TKRVariable);
-    procedure SetTimer(const Value: TKRTimer);
     procedure SetFormat(const Value: String);
+    procedure SetValType(const Value: TVarType);
+    procedure SetDateTime(const Value: TKRFieldDateTime);
+    procedure VarUp(AVar: TKRVariable); stdcall;
+    procedure VarErr(AVar: TKRVariable); stdcall;
+
+    // Out Functions
+    procedure UpOutFunction;
+
+    procedure OF_String;
+
+    procedure OF_Integer;
+    procedure OF_Integer_F;
+    procedure OF_DWORD_F;
+    procedure OF_Int64_F;
+    procedure OF_UInt64_F;
+
+    procedure OF_Float;
+    procedure OF_Float_F;
+
+    procedure OF_Time;
+    procedure OF_Date;
+    procedure OF_DateTime;
+    procedure OF_DateTime_F;
+    procedure OF_TimeD;
+    procedure OF_DateD;
+    procedure OF_DateTimeD;
+    procedure OF_DateTimeD_F;
+
   protected
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
-    procedure DoTimer; stdcall;
-    procedure DoTimer_;virtual;
+    procedure DoTimer(AChanged: boolean = false); virtual;
   public
     constructor Create(AOwner: TComponent);override;
     destructor Destroy;override;
@@ -89,11 +120,10 @@ type
   published
     property Variable: TKRVariable read FVariable write SetVariable;
     property VarSet: TKRVariable read FVarSet write SetVarSet;
-    property ValType: TVarType read FValType write FValType;
+    property ValType: TVarType read FValType write SetValType;
     property Format: String read FFormat write SetFormat;
     property FontColor: TColor read FFontColor write SetFontColor;
     property SkipUserError: boolean read FSkipUserError write FSkipUserError;
-    property Timer: TKRTimer read FTimer write SetTimer;
     property EnterAftExit: boolean read FEnterAftExit write FEnterAftExit default false;
     property Align;
     property Alignment;
@@ -115,6 +145,10 @@ type
     property InputMax: Variant read FInputMax write SetInputMax;
     property InputMin: Variant read FInputMin write SetInputMin;
     property AskBeforeInput: boolean read FAskBeforeInput write FAskBeforeInput default false;
+    property MsgMaximumLimit: String read FMsgMaximumLimit write FMsgMaximumLimit;
+    property MsgMinimumLimit: String read FMsgMinimumLimit write FMsgMinimumLimit;
+    property MsgAskBeforeInput: String read FMsgAskBeforeInput write FMsgAskBeforeInput;
+    property MsgIncorrectValue: String read FMsgIncorrectValue write FMsgIncorrectValue;
     property Constraints;
     property Ctl3D;
     property DoubleBuffered;
@@ -126,7 +160,7 @@ type
     property HideSelection;
     property Hint: String read FHint write SetHint;
     property ErrorToHint: boolean read FErrorToHint write SetErrorToHint;
-    property DateTime: TKRFieldDateTime read FDateTime write FDateTime default fdtNone;
+    property DateTime: TKRFieldDateTime read FDateTime write SetDateTime default fdtNone;
     property ImeMode;
     property ImeName;
     property MaxLength;
@@ -187,7 +221,7 @@ type
     procedure CMBidimodechanged(var Message: TMessage);
       message CM_BIDIMODECHANGED;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
-    procedure DoTimer_;override;
+    procedure DoTimer(AChanged: boolean = false);override;
   public
     constructor Create(AOwner: TComponent);override;
     procedure SetBounds(ALeft: Integer; ATop: Integer; AWidth: Integer; AHeight: Integer); override;
@@ -197,15 +231,7 @@ type
     property BLabel: TKRBoundLabel read FLabel;
   end;
 
-var
-  KRFldMsgMaximumLimit: String;
-  KRFldMsgMinimumLimit: String;
-  KRFldMsgAskBeforeInput: String;
-  KRFldMsgIncorrectValue: String;
-
 implementation
-
-uses funcs, lgop;
 
 { TKRField }
 
@@ -215,7 +241,6 @@ begin
   FFormat:='';
   FEnterAftExit:=false;
   FOldValue:=null;
-  FOldChange:=true;
   FOldError:=-12698139;
   FColor:=inherited Color;
   FErrorColor:=$2F2F2F;
@@ -231,6 +256,13 @@ begin
   FErrorToHint:=true;
   FEditing:=false;
   FDateTime:=fdtNone;
+
+  FMsgMaximumLimit:=KRFIELD_DEFAULT_MAXIMUMLIMIT_MSG;
+  FMsgMinimumLimit:=KRFIELD_DEFAULT_MINIMUMLIMIT_MSG;
+  FMsgAskBeforeInput:=KRFIELD_DEFAULT_ASKBEFOREINPUT_MSG;
+  FMsgIncorrectValue:=KRFIELD_DEFAULT_INCORRECTVALUE_MSG;
+
+  UpOutFunction;
   inherited OnKeyPress:=DoKeyPress;
   inherited OnEnter:=DoEnter_;
   inherited OnClick:=DoClick;
@@ -238,7 +270,7 @@ end;
 
 destructor TKRField.Destroy;
 begin
-  if(Assigned(FTimer))then FTimer.DelMon(Self);
+  if(Assigned(FVariable))then FVariable.DelMon(Self);
   inherited;
 end;
 
@@ -259,15 +291,11 @@ var
   Form: TCustomForm;
   st: integer;
   n,e: Integer;
-  dw: Cardinal;
   _val: Variant;
   sval,s:String;
-  b: boolean;
   ext: Extended;
-  sg: Single;
   i64: int64;
   ui64: uint64;
-  db: double;
 begin
   Form := GetParentForm(Self);
   if Key=#27 then begin
@@ -278,65 +306,11 @@ begin
     if Assigned(FVariable) then begin
       st:=0;
       case FValType of
-        VT_BYTE: begin
+        VT_BYTE, VT_WORD, VT_SMALLINT, VT_INT: begin
           s:=Trim(inherited Text);
-          if(Length(s)>0)and(LowerCase(s[Length(s)])='h')then begin
-            n:=HexToInt(LeftStr(s,Length(s)-1));
-            e:=0;
-          end else Val(s,n,e);
-          if e<>0 then st:=1 else
-          if(n<FInputMin)then st:=2 else
-          if(n>FInputMax)then st:=3 else begin
-            _val:=Byte(n);
-            sval:=IntToStr(_val);
-          end;
-        end;
-        VT_WORD: begin
-          s:=Trim(inherited Text);
-          if(Length(s)>0)and(LowerCase(s[Length(s)])='h')then begin
-            n:=HexToInt(LeftStr(s,Length(s)-1));
-            e:=0;
-          end else Val(s,n,e);
-          if e<>0 then st:=1 else
-          if(n<FInputMin)then st:=2 else
-          if(n>FInputMax)then st:=3 else begin
-            _val:=Word(n);
-            sval:=IntToStr(_val);
-          end;
-        end;
-        VT_DWORD: begin
-          s:=Trim(inherited Text);
-          if(Length(s)>0)and(LowerCase(s[Length(s)])='h')then begin
-            dw:=HexToInt(LeftStr(s,Length(s)-1));
-            b:=true;
-          end else b:=StrToDWord(s,dw);
-          if b then begin
-            if(dw<FInputMin)then st:=2 else
-            if(dw>FInputMax)then st:=3 else begin
-              _val:=dw;
-              sval:=DWordToStr(_val);
-            end;
-          end else st:=1;
-        end;
-        VT_SMALLINT: begin
-          s:=Trim(inherited Text);
-          if(Length(s)>0)and(LowerCase(s[Length(s)])='h')then begin
-            n:=HexToInt(LeftStr(s,Length(s)-1));
-            e:=0;
-          end else Val(s,n,e);
-          if e<>0 then st:=1 else
-          if(n<FInputMin)then st:=2 else
-          if(n>FInputMax)then st:=3 else begin
-            _val:=Smallint(n);
-            sval:=IntToStr(_val);
-          end;
-        end;
-        VT_INT: begin
-          s:=Trim(inherited Text);
-          if(Length(s)>0)and(LowerCase(s[Length(s)])='h')then begin
-            n:=HexToInt(LeftStr(s,Length(s)-1));
-            e:=0;
-          end else Val(s,n,e);
+          if(Length(s)>0)and(LowerCase(s[Length(s)])='h')then
+            s:='$'+LeftStr(s,Length(s)-1);
+          Val(s,n,e);
           if e<>0 then st:=1 else
           if(n<FInputMin)then st:=2 else
           if(n>FInputMax)then st:=3 else begin
@@ -344,8 +318,10 @@ begin
             sval:=IntToStr(_val);
           end;
         end;
-        VT_INT64: begin
+        VT_INT64, VT_DWORD: begin
           s:=Trim(inherited Text);
+          if(Length(s)>0)and(LowerCase(s[Length(s)])='h')then
+            s:='$'+LeftStr(s,Length(s)-1);
           Val(s,i64,e);
           if e<>0 then st:=1 else
           if(i64<FInputMin)then st:=2 else
@@ -356,6 +332,8 @@ begin
         end;
         VT_UINT64: begin
           s:=Trim(inherited Text);
+          if(Length(s)>0)and(LowerCase(s[Length(s)])='h')then
+            s:='$'+LeftStr(s,Length(s)-1);
           Val(s,ui64,e);
           if e<>0 then st:=1 else
           if(ui64<FInputMin)then st:=2 else
@@ -364,31 +342,15 @@ begin
             sval:=IntToStr(_val);
           end;
         end;
-        VT_SINGLE: begin
+        VT_DOUBLE, VT_SINGLE: begin
           s:=Trim(inherited Text);
           if FormatSettings.DecimalSeparator=#44
           then s:=ReplaceStr(s,'.',FormatSettings.DecimalSeparator)
           else s:=ReplaceStr(s,',',FormatSettings.DecimalSeparator);
           if TextToFloat(PChar(S), ext, fvExtended, FormatSettings) then begin
-            sg:=ext;
-            if(sg<FInputMin)then st:=2 else
-            if(sg>FInputMax)then st:=3 else begin
-              _val:=sg;
-              if FFormat='' then sval:=FloatToStr(_val)
-              else sval:=FormatFloat(FFormat,_val);
-            end;
-          end else st:=1;
-        end;
-        VT_DOUBLE: begin
-          s:=Trim(inherited Text);
-          if FormatSettings.DecimalSeparator=#44
-          then s:=ReplaceStr(s,'.',FormatSettings.DecimalSeparator)
-          else s:=ReplaceStr(s,',',FormatSettings.DecimalSeparator);
-          if TextToFloat(PChar(S), ext, fvExtended, FormatSettings) then begin
-            db:=ext;
-            if(db<FInputMin)then st:=2 else
-            if(db>FInputMax)then st:=3 else begin
-              _val:=db;
+            if(ext<FInputMin)then st:=2 else
+            if(ext>FInputMax)then st:=3 else begin
+              _val:=ext;
               if FFormat='' then sval:=FloatToStr(_val)
               else FormatFloat(FFormat,_val);
             end;
@@ -402,7 +364,7 @@ begin
       case st of
         0: if FAskBeforeInput then begin
           FAsk:=true;
-          if AppMsgBox(ReplaceStr(KRFldMsgAskBeforeInput,'[#Value]',sval),MB_YESNOCANCEL or MB_ICONQUESTION)=IDYES then begin
+          if KRAppMsgBox(ReplaceStr(FMsgAskBeforeInput,'[#Value]',sval),MB_YESNOCANCEL or MB_ICONQUESTION)=IDYES then begin
             if Assigned(FSetValue) then FSetValue(Self,_val);
             if Assigned(FVarSet) then FVarSet.Value:=_val else FVariable.Value:=_val;
           end;
@@ -411,16 +373,16 @@ begin
           if Assigned(FSetValue) then FSetValue(Self,_val);
           if Assigned(FVarSet) then FVarSet.Value:=_val else FVariable.Value:=_val;
         end;
-        1: AppMsgBox(ReplaceStr(KRFldMsgIncorrectValue,'[#Value]',sval),MB_OKCANCEL or MB_ICONERROR);
+        1: KRAppMsgBox(ReplaceStr(FMsgIncorrectValue,'[#Value]',sval),MB_OKCANCEL or MB_ICONERROR);
         2: begin
           if (FValType<>VT_SINGLE)and(FValType<>VT_DOUBLE) then s:=IntToStr(FInputMin) else
             if FFormat='' then s:=FloatToStr(FInputMin) else s:=FormatFloat(FFormat,FInputMin);
-          AppMsgBox(ReplaceStr(KRFldMsgMinimumLimit,'[#Value]',s),MB_OKCANCEL or MB_ICONERROR);
+          KRAppMsgBox(ReplaceStr(FMsgMinimumLimit,'[#Value]',s),MB_OKCANCEL or MB_ICONERROR);
         end;
         3: begin
           if (FValType<>VT_SINGLE)and(FValType<>VT_DOUBLE) then s:=IntToStr(FInputMax) else
             if FFormat='' then s:=FloatToStr(FInputMax) else s:=FormatFloat(FFormat,FInputMax);
-          AppMsgBox(ReplaceStr(KRFldMsgMaximumLimit,'[#Value]',s),MB_OKCANCEL or MB_ICONERROR);
+          KRAppMsgBox(ReplaceStr(FMsgMaximumLimit,'[#Value]',s),MB_OKCANCEL or MB_ICONERROR);
         end;
       end;
     end;
@@ -431,104 +393,32 @@ begin
   if Assigned(FOnKeyPress) then FOnKeyPress(Self,Key);
 end;
 
-procedure TKRField.DoTimer;
-var
-  val: Variant;
-  i64: int64;
-  ui64: uint64;
-
-  function VarSameValue(const A, B: Variant): Boolean;
-  var
-    LA, LB: TVarData;
-  begin
-    LA := FindVarData(A)^;
-    LB := FindVarData(B)^;
-    if LA.VType = varEmpty then
-      Result := LB.VType = varEmpty
-    else if LA.VType = varNull then
-      Result := LB.VType = varNull
-    else if LB.VType in [varEmpty, varNull] then
-      Result := False
-    else if VarIsFloat(A) and IsNaN(A) then
-      Result := VarIsFloat(B) and IsNaN(B)
-    else if VarIsFloat(B) and IsNaN(B) then
-      Result := VarIsFloat(A) and IsNaN(A)
-    else Result := A = B;
-  end;
-
+procedure TKRField.DoTimer(AChanged: boolean = false);
 begin
-  if FEditing then Exit;
-
-  if Assigned(FVariable) then begin
-    if(not VarSameValue(FVariable.Value,FOldValue))or(FOldChange)or(FOldError<>FVariable.Error)then begin
+  if FEditing or not Assigned(FVariable) then Exit;
 
 
-      FOldChange:=false;
-      FOldValue:=FVariable.Value;
-      FOldError:=FVariable.Error;
+  if AChanged or (not KRVarIsEqually(FVariable.Value,FOldValue))or(FOldError<>FVariable.Error)then begin
 
-      if(FVariable.Error=0)or((FVariable.Error=-2147483648)and(FSkipUserError))then begin
-        inherited Hint:=FHint;
-        inherited Color:=FColor;
-        if not FEditing then Font.Color:=FFontColor;
-      end else begin
-        if FErrorToHint then inherited Hint:=FVariable.ErrorMsg;
-        inherited Color:=FErrorColor;
-        Font.Color:=FErrorFontColor;
-      end;
+    FOldValue:=FVariable.Value;
+    FOldError:=FVariable.Error;
 
-      val:=FOldValue;
-      if Assigned(FShowValue) then FShowValue(Self,val);
-
-      if(FDateTime<>fdtNone)and(FValType in [VT_BYTE,VT_WORD,VT_DWORD,VT_SMALLINT,VT_INT,VT_INT64,VT_UINT64])then begin
-        case FDateTime of
-          fdtTime: if FFormat='' then inherited Text:=FormatDateTime('h:nn:ss',MKTimeToDateTime(val))
-            else inherited Text:=FormatDateTime(FFormat,MKTimeToDateTime(val));
-          fdtDate: if FFormat='' then inherited Text:=FormatDateTime('dd.mm.yyyy',MKTimeToDateTime(val))
-            else inherited Text:=FormatDateTime(FFormat,MKTimeToDateTime(val));
-          fdtDateTime: if FFormat='' then inherited Text:=FormatDateTime('dd.mm.yyyy h:nn:ss',MKTimeToDateTime(val))
-            else inherited Text:=FormatDateTime(FFormat,MKTimeToDateTime(val));
-        end;
-      end else if(FDateTime<>fdtNone)and(FValType in [VT_SINGLE,VT_DOUBLE])then begin
-        case FDateTime of
-          fdtTime: if FFormat='' then inherited Text:=FormatDateTime('h:nn:ss',val)
-            else inherited Text:=FormatDateTime(FFormat,val);
-          fdtDate: if FFormat='' then inherited Text:=FormatDateTime('dd.mm.yyyy',val)
-            else inherited Text:=FormatDateTime(FFormat,val);
-          fdtDateTime: if FFormat='' then inherited Text:=FormatDateTime('dd.mm.yyyy h:nn:ss',val)
-            else inherited Text:=FormatDateTime(FFormat,val);
-        end;
-      end else case FValType of
-        VT_BYTE: if FFormat='' then inherited Text:=IntToStr(val) else
-          inherited Text:={$IF CompilerVersion >= 23}System.{$IFEND}SysUtils.Format(FFormat,[Byte(val)]);
-        VT_WORD: if FFormat='' then inherited Text:=IntToStr(val) else
-          inherited Text:={$IF CompilerVersion >= 23}System.{$IFEND}SysUtils.Format(FFormat,[Word(val)]);
-        VT_DWORD: if FFormat='' then inherited Text:=IntToStr(val)else
-          inherited Text:={$IF CompilerVersion >= 23}System.{$IFEND}SysUtils.Format(FFormat,[cardinal(val)]);
-        VT_SMALLINT: if FFormat='' then inherited Text:=IntToStr(val) else
-         inherited Text:={$IF CompilerVersion >= 23}System.{$IFEND}SysUtils.Format(FFormat,[integer(val)]);
-        VT_INT: if FFormat='' then inherited Text:=IntToStr(val) else
-          inherited Text:={$IF CompilerVersion >= 23}System.{$IFEND}SysUtils.Format(FFormat,[integer(val)]);
-        VT_INT64: if FFormat='' then inherited Text:=IntToStr(val) else begin
-          i64:=val;
-          inherited Text:={$IF CompilerVersion >= 23}System.{$IFEND}SysUtils.Format(FFormat,[i64]);
-        end;
-        VT_UINT64: if FFormat='' then inherited Text:=IntToStr(val) else begin
-          ui64:=val;
-          inherited Text:={$IF CompilerVersion >= 23}System.{$IFEND}SysUtils.Format(FFormat,[ui64]);
-        end;
-        VT_SINGLE, VT_DOUBLE: if FFormat='' then inherited Text:=FloatToStr(val)else
-          inherited Text:=FormatFloat(FFormat,val);
-        VT_STRING: inherited Text:=val;
-        end;
+    if(FVariable.Error=0)or((FVariable.Error=-2147483648)and(FSkipUserError))then begin
+      inherited Hint:=FHint;
+      inherited Color:=FColor;
+      if not FEditing then Font.Color:=FFontColor;
+    end else begin
+      if FErrorToHint then inherited Hint:=FVariable.ErrorMsg;
+      inherited Color:=FErrorColor;
+      Font.Color:=FErrorFontColor;
     end;
+
+    curval:=FOldValue;
+    if Assigned(FShowValue) then FShowValue(Self,curval);
+
+    FOutFunction;
+
   end;
-  DoTimer_;
-end;
-
-procedure TKRField.DoTimer_;
-begin
-
 end;
 
 function TKRField.GetReadOnly: boolean;
@@ -546,10 +436,93 @@ begin
   inherited;
   if(Operation = opRemove)then
     if (AComponent = FVariable)then FVariable:= nil else
-    if (AComponent = FVarSet)then FVarSet:= nil else
-    if (AComponent = FTimer)then begin
-      FTimer:=nil;
-    end;
+    if (AComponent = FVarSet)then FVarSet:= nil
+end;
+
+procedure TKRField.OF_Date;
+begin
+  inherited Text:=DateToStr(KRUnixToDateTime(curval));
+end;
+
+procedure TKRField.OF_DateD;
+begin
+  inherited Text:=DateToStr(curval);
+end;
+
+procedure TKRField.OF_DateTime;
+begin
+  inherited Text:=DateTimeToStr(KRUnixToDateTime(curval));
+end;
+
+procedure TKRField.OF_DateTimeD;
+begin
+  inherited Text:=DateTimeToStr(curval);
+end;
+
+procedure TKRField.OF_DateTimeD_F;
+begin
+  inherited Text:=FormatDateTime(FFormat,curval);
+end;
+
+procedure TKRField.OF_DateTime_F;
+begin
+  inherited Text:=FormatDateTime(FFormat,KRUnixToDateTime(curval));
+end;
+
+procedure TKRField.OF_DWORD_F;
+begin
+  inherited Text:={$IF CompilerVersion >= 23}System.{$IFEND}SysUtils.Format(FFormat,[cardinal(curval)]);
+end;
+
+procedure TKRField.OF_Float;
+begin
+  inherited Text:=FloatToStr(curval);
+end;
+
+procedure TKRField.OF_Float_F;
+begin
+  inherited Text:=FormatFloat(FFormat,curval);
+end;
+
+procedure TKRField.OF_Int64_F;
+var i: int64;
+begin
+  i:=curval;
+  inherited Text:={$IF CompilerVersion >= 23}System.{$IFEND}SysUtils.Format(FFormat,[i]);
+end;
+
+procedure TKRField.OF_Integer;
+begin
+  inherited Text:=IntToStr(curval);
+end;
+
+procedure TKRField.OF_Integer_F;
+var i: integer;
+begin
+  i:=curval;
+  inherited Text:={$IF CompilerVersion >= 23}System.{$IFEND}SysUtils.Format(FFormat,[i]);
+end;
+
+procedure TKRField.OF_String;
+begin
+  inherited Text:=curval;
+end;
+
+procedure TKRField.OF_Time;
+begin
+  inherited Text:=TimeToStr(KRUnixToDateTime(curval));
+end;
+
+procedure TKRField.OF_TimeD;
+begin
+  inherited Text:=TimeToStr(curval);
+end;
+
+procedure TKRField.OF_UInt64_F;
+var i: uint64;
+begin
+  i:=curval;
+  inherited Text:={$IF CompilerVersion >= 23}System.{$IFEND}SysUtils.Format(FFormat,[i]);
 end;
 
 procedure TKRField.SetChangeFontColor(const Value: TColor);
@@ -557,7 +530,7 @@ begin
   if FChangeFontColor <> Value then begin
     FChangeFontColor := Value;
     if FEditing then Font.Color:=FChangeFontColor;
-    FOldChange:=true;
+    DoTimer(true);
   end;
 end;
 
@@ -566,8 +539,14 @@ begin
   if FColor<>Value then begin
     FColor:=Value;
     if(not Assigned(FVariable))or(FVariable.Error=0)then inherited Color:=FColor;
-    FOldChange:=true;
+    DoTimer(true);
   end;
+end;
+
+procedure TKRField.SetDateTime(const Value: TKRFieldDateTime);
+begin
+  FDateTime := Value;
+  UpOutFunction;
 end;
 
 procedure TKRField.SetErrorColor(const Value: TColor);
@@ -575,7 +554,7 @@ begin
   if FErrorColor<>Value then begin
     FErrorColor:=Value;
     if(Assigned(FVariable))and(FVariable.Error<>0)then inherited Color:=FErrorColor;
-    FOldChange:=true;
+    DoTimer(true);
   end;
 end;
 
@@ -584,7 +563,7 @@ begin
   if FErrorFontColor<>Value then begin
     FErrorFontColor := Value;
     if(Assigned(FVariable))and(FVariable.Error<>0)then Font.Color:=FErrorFontColor;
-    FOldChange:=true;
+    DoTimer(true);
   end;
 end;
 
@@ -601,13 +580,13 @@ begin
   FFontColor := Value;
   if(Assigned(FVariable))and(FVariable.Error=0)then Font.Color:=FFontColor;
   if FEditing then Font.Color:=FChangeFontColor;
-  FOldChange:=true;
+  DoTimer(true);
 end;
 
 procedure TKRField.SetFormat(const Value: String);
 begin
   FFormat := Value;
-  FOldChange:=true;
+  UpOutFunction;
 end;
 
 procedure TKRField.SetHint(const Value: String);
@@ -635,38 +614,30 @@ begin
     Cursor:=crArrow;
     FEditing:=false;
   end else Cursor:=crDefault;
-  FOldChange:=true;
 end;
 
-procedure TKRField.SetTimer(const Value: TKRTimer);
+procedure TKRField.SetValType(const Value: TVarType);
 begin
-  if FTimer<>Value then begin
-    if(Assigned(FTimer))then begin
-      while FTimer.Working do Application.ProcessMessages;
-      FTimer.DelMon(Self);
-    end;
-    FTimer := Value;
-    if(Assigned(FTimer))then begin
-      FTimer.FreeNotification(Self);
-      while FTimer.Working do Application.ProcessMessages;
-      FTimer.AddMon(Self);
-    end;
-  end;
-  FOldChange:=true;
+  FValType := Value;
+  UpOutFunction;
 end;
 
 procedure TKRField.SetVariable(const Value: TKRVariable);
 begin
   if FVariable<>Value then begin
-    if Assigned(FVariable) then FVariable.RemoveFreeNotification(Self);
+    if Assigned(FVariable) then begin
+      FVariable.DelMon(Self);
+      FVariable.RemoveFreeNotification(Self);
+    end;
     FVariable := Value;
     if Assigned(FVariable) then begin
       FVariable.FreeNotification(Self);
       if(csDesigning in ComponentState)and(not(csLoading  in ComponentState))then
         FValType:=FVariable.VarType;
+      FVariable.AddMon(Self);
     end;
   end;
-  FOldChange:=true;
+  UpOutFunction;
 end;
 
 procedure TKRField.SetVarSet(const Value: TKRVariable);
@@ -679,12 +650,47 @@ begin
   end;
 end;
 
+procedure TKRField.UpOutFunction;
+begin
+  if(FDateTime<>fdtNone)and(FValType in [VT_BYTE,VT_WORD,VT_DWORD,VT_SMALLINT,VT_INT,VT_INT64])then begin
+    case FDateTime of
+      fdtTime: if FFormat='' then FOutFunction:=OF_Time else FOutFunction:=OF_DateTime_F;
+      fdtDate: if FFormat='' then FOutFunction:=OF_Date else FOutFunction:=OF_DateTime_F;
+      fdtDateTime: if FFormat='' then FOutFunction:=OF_DateTime else FOutFunction:=OF_DateTime_F;
+    end;
+  end else if(FDateTime<>fdtNone)and(FValType in [VT_SINGLE,VT_DOUBLE])then begin
+    case FDateTime of
+      fdtTime: if FFormat='' then FOutFunction:=OF_TimeD else FOutFunction:=OF_DateTimeD_F;
+      fdtDate: if FFormat='' then FOutFunction:=OF_DateD else FOutFunction:=OF_DateTimeD_F;
+      fdtDateTime: if FFormat='' then FOutFunction:=OF_DateTimeD else FOutFunction:=OF_DateTimeD_F;
+    end;
+  end else case FValType of
+    VT_BYTE, VT_WORD, VT_SMALLINT, VT_INT: if FFormat='' then FOutFunction:=OF_Integer else FOutFunction:=OF_Integer_F;
+    VT_DWORD: if FFormat='' then FOutFunction:=OF_Integer else FOutFunction:=OF_DWORD_F;
+    VT_INT64: if FFormat='' then FOutFunction:=OF_Integer else FOutFunction:=OF_Int64_F;
+    VT_UINT64: if FFormat='' then FOutFunction:=OF_Integer else FOutFunction:=OF_UInt64_F;
+    VT_SINGLE, VT_DOUBLE: if FFormat='' then FOutFunction:=OF_Float else FOutFunction:=OF_Float_F;
+    VT_STRING: FOutFunction:=OF_String;
+  end;
+  DoTimer(true);
+end;
+
+procedure TKRField.VarErr(AVar: TKRVariable);
+begin
+  DoTimer(true);
+end;
+
+procedure TKRField.VarUp(AVar: TKRVariable);
+begin
+  DoTimer;
+end;
+
 procedure TKRField.WMFontChange(var Message: TMessage);
 begin
   FFontColor:=Font.Color;
   if(Assigned(FVariable))and(FVariable.Error<>0)then Font.Color:=FErrorFontColor;
   if FEditing then Font.Color:=FChangeFontColor;
-  FOldChange:=true;
+  DoTimer(true);
 end;
 
 procedure TKRField.WMKillFocus(var Message: TWMKillFocus);
@@ -696,8 +702,7 @@ begin
     DoKeyPress(nil,key);
   end else begin
     FEditing:=false;
-    FOldChange:=true;
-    DoTimer;
+    DoTimer(true);
   end;
   inherited;
 end;
@@ -709,7 +714,6 @@ begin
     (Assigned(FVariable))and
     ((FVariable.Error=0)or((FVariable.Error=-2147483648)and(FSkipUserError)))then begin
     FEditing:=true;
-    FOldChange:=true;
     Font.Color:=FChangeFontColor;
     inherited;
   end;
@@ -742,9 +746,9 @@ begin
   FErrorToBoundLabel:=false;
 end;
 
-procedure TKRBLField.DoTimer_;
+procedure TKRBLField.DoTimer(AChanged: boolean = false);
 begin
-  inherited;
+  inherited DoTimer(AChanged);
   if Assigned(Variable)then
     if FErrorToBoundLabel then if Variable.Error=0 then FLabel.Caption:='' else FLabel.Caption:=Variable.ErrorMsg;
 end;
@@ -784,9 +788,4 @@ begin
   FLabel.FreeNotification(Self);
 end;
 
-initialization
-  KRFldMsgMaximumLimit:='Значение не должно быть больше [#Value]';
-  KRFldMsgMinimumLimit:='Значение не должно быть меньше [#Value]';
-  KRFldMsgAskBeforeInput:='Установить значение «[#Value]»?';
-  KRFldMsgIncorrectValue:='Неверно введено значение!';
 end.

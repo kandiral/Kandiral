@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRBTSocketClient                                                          *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 16.09.2019                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -14,11 +14,16 @@ interface
 
 uses
   {$IF CompilerVersion >= 23}
-    System.SysUtils,
+    {$IF CompilerVersion >= 28}Winapi.Bluetooth, {$IFEND}Winapi.Winsock2, System.SysUtils,
   {$ELSE}
-    SysUtils,
+    Winsock2, SysUtils,
   {$IFEND}
-  KRSockets, JwaWinsock2, JwaWs2Bth;
+  KRSockets
+
+{$IF CompilerVersion <= 27}
+  , JwaWs2Bth
+{$IFEND}
+;
 
 type
   TKRBTSocketClient = class(TKRSocketClient)
@@ -47,7 +52,8 @@ end;
 
 procedure TKRBTSocketClient.Open;
 var
-  addr: SOCKADDR_BTH;
+//  addr: TSockAddr;
+  addr: TSockAddrBth;
   AddrSize: cardinal;
   writeReady, exceptFlag: Boolean;
 begin
@@ -59,7 +65,7 @@ begin
     addr.btAddr := FAddr;
     addr.port := Cardinal(BT_PORT_ANY);
     addr.serviceClassId := StringToGUID('{00001101-0000-1000-8000-00805F9B34FB}');
-    FConnected := ErrorCheck(JwaWinSock2.connect(FSocket, @addr, AddrSize)) = 0;
+    FConnected := ErrorCheck(connect(FSocket, PSockAddr(@addr)^, AddrSize)) = 0;
     if not FConnected then begin
       Select(FSocket, nil, @writeReady, @exceptFlag, FConnectTimeout);
       FConnected := writeReady and not exceptFlag;
