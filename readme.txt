@@ -58,5 +58,5 @@ Library path:
 $(KANDIRAL)\Release\$(ProductVersion)\$(Platform);$(KANDIRAL)\Resources;$(KANDIRAL)\dfm;$(JEDI)\jwa\branches\2.3\Common;$(JEDI)\jwa\branches\2.3\Includes;$(JEDI)\jwa\branches\2.3\SaCMAPI;$(JEDI)\jwa\branches\2.3\Win32API
 
 Browsing path:
-$(KANDIRAL)\Common;$(KANDIRAL)\Automation;$(KANDIRAL)\File;$(KANDIRAL)\Media;$(KANDIRAL)\Net;$(KANDIRAL)\Utils;$(KANDIRAL)\Graphics;$(KANDIRAL)\Web
+$(KANDIRAL)\Automation;$(KANDIRAL)\Common;$(KANDIRAL)\Crypting;$(KANDIRAL)\File;$(KANDIRAL)\Graphics;$(KANDIRAL)\ISO;$(KANDIRAL)\Media;$(KANDIRAL)\Net;$(KANDIRAL)\Utils;$(KANDIRAL)\Web
 
