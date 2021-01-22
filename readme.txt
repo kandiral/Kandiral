@@ -24,13 +24,15 @@ C:\Delphi\Kandiral\
         $(KANDIRAL)\Resources
         $(KANDIRAL)\dfm
     в "Browsing path" добавляем такие пути
-	$(KANDIRAL)\Common
 	$(KANDIRAL)\Automation
+	$(KANDIRAL)\Common
+	$(KANDIRAL)\Crypting
 	$(KANDIRAL)\File
+	$(KANDIRAL)\Graphics
+	$(KANDIRAL)\ISO
 	$(KANDIRAL)\Media
 	$(KANDIRAL)\Net
 	$(KANDIRAL)\Utils
-	$(KANDIRAL)\Graphics
 	$(KANDIRAL)\Web
 5. Открываем одну из групп проектов, которая соответствует вашей версии Delphi. Имя файла группы проектов имеет следующий вид Kandiral150.groupproj. Где 150 - это Package Version (подробнее см. тут http://docwiki.embarcadero.com/RADStudio/Seattle/en/Compiler_Versions).
         Kandiral150.groupproj        Delphi XE
