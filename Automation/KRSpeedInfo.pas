@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRSpeedInfo                                                               *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 17.02.2021                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -112,7 +112,7 @@ begin
   FNrmArray:=TKRNormalArray255.Create;
   FNrmArray.Len:=10;
   FAverageSpeed:=10;
-  FFormat:='0.00';
+  FFormat:='0.0#';
   FSpeedStep:=ssSecond;
 end;
 
@@ -128,23 +128,24 @@ end;
 
 procedure TKRSpeedInfo.DoTimer;
 var
-  _cntr,_rz,k: Cardinal;
-  _spd: Extended;
+  _cntr,_rz, dt: Cardinal;
+  _spd, k: Extended;
   s: String;
 begin
   _spd:=0;
   if Assigned(FComponent) then begin
+    dt:=getTickCount;
     _cntr:=FComponent.GetCounter;
-    if _cntr<FOldCounter then _rz:=$FFFFFFFF-FOldCounter+_cntr else _rz:=_cntr-FOldCounter;
+    _rz:=_cntr-FOldCounter;
     k:=1;
     case FSpeedStep of
       ssSecond: k:=1000;
       ssMinute: k:=60000;
       ssHour: k:=3600000;
     end;
-    _spd:=_rz/((getTickCount-FOldDt)/k);
+    _spd:=_rz*k/(dt-FOldDt);
     FOldCounter:=_cntr;
-    FOldDT:=getTickCount;
+    FOldDT:=dt;
   end;
   if FFormat<>'' then s:=FormatFloat(FFormat,_spd) else s:=FloatToStr(_spd);
   if FAverageSpeed>0 then begin

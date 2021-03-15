@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRProgressBar                                                             *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 14.03.2021                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -54,6 +54,52 @@ type
     property Position: Integer read GetPosition write SetPosition default 0;
     property Min: Integer read GetMin write SetMin default 0;
     property Max: Integer read GetMax write SetMax default 100;
+    property Align;
+    property Anchors;
+    property BorderWidth;
+    property DoubleBuffered;
+    property DragCursor;
+    property DragKind;
+    property DragMode;
+    property Enabled;
+    property Hint;
+    property Constraints;
+    property Orientation;
+    property ParentDoubleBuffered;
+    property ParentShowHint;
+    property PopupMenu;
+    property Smooth;
+    property Style;
+    property MarqueeInterval;
+    property BarColor;
+    property BackgroundColor;
+    property SmoothReverse;
+    property Step;
+    property State;
+    property ShowHint;
+    property TabOrder;
+    property TabStop;
+    property Touch;
+    property Visible;
+    {$IF CompilerVersion >= 24}
+      property StyleElements;
+    {$IFEND}
+    property OnContextPopup;
+    property OnDragDrop;
+    property OnDragOver;
+    property OnEndDock;
+    property OnEndDrag;
+    property OnEnter;
+    property OnExit;
+    property OnGesture;
+    property OnMouseActivate;
+    property OnMouseDown;
+    property OnMouseEnter;
+    property OnMouseLeave;
+    property OnMouseMove;
+    property OnMouseUp;
+    property OnStartDock;
+    property OnStartDrag;
   end;
 
 implementation

@@ -9,21 +9,21 @@ package KRGraphics;
 {$EXTENDEDSYNTAX ON}
 {$IMPORTEDDATA ON}
 {$IOCHECKS ON}
-{$LOCALSYMBOLS ON}
+{$LOCALSYMBOLS OFF}
 {$LONGSTRINGS ON}
 {$OPENSTRINGS ON}
-{$OPTIMIZATION OFF}
+{$OPTIMIZATION ON}
 {$OVERFLOWCHECKS OFF}
 {$RANGECHECKS OFF}
 {$REFERENCEINFO ON}
 {$SAFEDIVIDE OFF}
-{$STACKFRAMES ON}
+{$STACKFRAMES OFF}
 {$TYPEDADDRESS OFF}
 {$VARSTRINGCHECKS ON}
 {$WRITEABLECONST OFF}
 {$MINENUMSIZE 1}
 {$IMAGEBASE $400000}
-{$DEFINE DEBUG}
+{$DEFINE RELEASE}
 {$ENDIF IMPLICITBUILDING}
 {$DESCRIPTION 'KRGraphics'}
 {$LIBSUFFIX '220'}
@@ -37,6 +37,7 @@ requires
 contains
   KRColorBox in '..\..\Graphics\KRColorBox.pas',
   KRPenStyle in '..\..\Graphics\KRPenStyle.pas',
-  KRPenWidth in '..\..\Graphics\KRPenWidth.pas';
+  KRPenWidth in '..\..\Graphics\KRPenWidth.pas',
+  KRGraphicsRegister in 'KRGraphicsRegister.pas';
 
 end.

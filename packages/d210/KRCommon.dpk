@@ -85,6 +85,7 @@ contains
   KRVariants in '..\..\Utils\KRVariants.pas',
   KRValueEditLng in '..\..\Common\KRValueEditLng.pas',
   KRThreadEvent in '..\..\Common\KRThreadEvent.pas',
-  KRThreadQueueEvent in '..\..\Common\KRThreadQueueEvent.pas';
+  KRThreadQueueEvent in '..\..\Common\KRThreadQueueEvent.pas',
+  KRKernel32 in '..\..\Windows\KRKernel32.pas';
 
 end.

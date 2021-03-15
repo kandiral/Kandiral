@@ -78,6 +78,7 @@ contains
   KRFieldLng in '..\..\Automation\KRFieldLng.pas',
   KRModbusClientLng in '..\..\Automation\KRModbusClientLng.pas',
   KRModbusLng in '..\..\Automation\KRModbusLng.pas',
-  KRModbusMasterLng in '..\..\Automation\KRModbusMasterLng.pas';
+  KRModbusMasterLng in '..\..\Automation\KRModbusMasterLng.pas',
+  KRModbusSlave in '..\..\Automation\KRModbusSlave.pas';
 
 end.

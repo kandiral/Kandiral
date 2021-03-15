@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRComponentCollection                                                     *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 02.02.2021                                                          *)
 (*  https://kandiral.ru/delphi/krcomponentcollection.pas.html                 *)
 (*                                                                            *)
 (******************************************************************************)
@@ -176,7 +176,7 @@ begin
   Result:=-1;
   if not Assigned(FCollection) then exit;
 
-  Result:=TKRComponentCollection(Owner).FItems.IndexOf(Self);
+  Result:=TKRComponentCollection(FCollection).FItems.IndexOf(Self);
 end;
 
 function TKRComponentCollectionItem.GetParentComponent: TComponent;

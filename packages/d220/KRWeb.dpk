@@ -39,9 +39,15 @@ requires
 
 contains
   KRWebRegister in 'KRWebRegister.pas',
+  KRGoogleAPI in '..\..\Web\KRGoogleAPI.pas',
   KRGoogleAuth in '..\..\Web\KRGoogleAuth.pas',
+  KRGoogleCommon in '..\..\Web\KRGoogleCommon.pas',
   KRGoogleContacts in '..\..\Web\KRGoogleContacts.pas',
+  KRGoogleSearchConsole in '..\..\Web\KRGoogleSearchConsole.pas',
   KRGoogleSheets in '..\..\Web\KRGoogleSheets.pas',
-  KRGoogleSearchConsole in '..\..\Web\KRGoogleSearchConsole.pas';
+  KRGoogleTranslate in '..\..\Web\KRGoogleTranslate.pas',
+  KRIdHTTP in '..\..\Web\KRIdHTTP.pas',
+  KRWebCommon in '..\..\Web\KRWebCommon.pas',
+  KRWebDownload in '..\..\Web\KRWebDownload.pas';
 
 end.

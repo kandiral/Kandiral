@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRVariables                                                               *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 07.02.2021                                                          *)
 (*  https://kandiral.ru/delphi/krvariables.pas.html                           *)
 (*                                                                            *)
 (******************************************************************************)
@@ -104,7 +104,7 @@ type
     procedure Activate;
     procedure Deactivate;
     procedure DoError(AAsync: boolean = false);virtual;
-    procedure UpdateValueRequest;virtual;abstract;
+    procedure UpdateValueRequest; virtual;
     procedure UpdateValueResponse(AVal: Variant; AAsync: boolean = false);virtual;
     procedure SetValueRequest(var AValue: Variant);virtual;abstract;
     procedure SetValueResponse(var AValue: Variant);virtual;
@@ -512,6 +512,11 @@ begin
   finally
     CS.Leave;
   end;
+end;
+
+procedure TKRVariable.UpdateValueRequest;
+begin
+  FRequestTM := getTickCount;
 end;
 
 procedure TKRVariable.UpdateValueResponse(AVal: Variant; AAsync: boolean);

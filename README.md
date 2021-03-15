@@ -40,6 +40,8 @@ $(KANDIRAL)\Media
 $(KANDIRAL)\Net
 $(KANDIRAL)\Utils
 $(KANDIRAL)\Web
+$(KANDIRAL)\Windows
+
 ```
 Open one group of projects corresponding to your version of Delphi. The name of the project group file is "Kandiral150.groupproj". Where 150 is the [Package Version](http://docwiki.embarcadero.com/RADStudio/Seattle/en/Compiler_Versions)
 ```bash

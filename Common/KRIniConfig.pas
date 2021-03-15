@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRIniConfig                                                               *)
-(*  Ver.: 16.09.2019                                                          *)
+(*  Ver.: 09.02.2021                                                          *)
 (*  https://kandiral.ru/delphi/kriniconfig.pas.html                           *)
 (*                                                                            *)
 (******************************************************************************)
@@ -355,8 +355,8 @@ begin
     for i := 0 to ItemsCount-1 do begin
       TKRIniCfgParam(Items[i]).FValue:=null;
       for j := 0 to TKRIniCfgParam(Items[i]).FList.Count-1 do
-        if TKRIniCfgParam(Items[i]).FValue<>null then begin
-          TKRIniCfgParam(Items[i]).FValue:=null;
+        if TKRIniCfgParam(Items[i]).Value<>null then begin
+//          TKRIniCfgParam(Items[i]).FValue:=null;
           IKRCfgParam(TKRIniCfgParam(Items[i]).FList.Items[j]).CfgParamChange(TKRIniCfgParam(Items[i]));
         end;
     end;

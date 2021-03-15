@@ -1,9 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <BorlandProject>
 	<Transactions>
-    <Transaction>1899.12.30 00:00:00.000.021,C:\Users\kandiral\Documents\RAD Studio\Projects\ProjectGroup1.groupproj=X:\Components\Kandiral\Kandiral150.groupproj</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.021,X:\Components\Kandiral\Kandiral150.groupproj=C:\Users\kandiral\Documents\RAD Studio\Projects\ProjectGroup1.groupproj</Transaction>
   </Transactions>
 	<Default.Personality>
-		<Projects ActiveProject="X:\Components\Kandiral\packages\d150\KRAutomation.dproj"/>
+		<Projects ActiveProject="X:\Components\Kandiral\packages\d150\KRCommon.dproj"/>
 	</Default.Personality>
 </BorlandProject>

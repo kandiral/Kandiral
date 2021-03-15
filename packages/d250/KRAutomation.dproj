@@ -138,6 +138,7 @@
         <DCCReference Include="..\..\Automation\KRModbusClientLng.pas"/>
         <DCCReference Include="..\..\Automation\KRModbusLng.pas"/>
         <DCCReference Include="..\..\Automation\KRModbusMasterLng.pas"/>
+        <DCCReference Include="..\..\Automation\KRModbusSlave.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

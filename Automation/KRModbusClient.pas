@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRModbusClient                                                            *)
-(*  Ver.: 23.08.2020                                                          *)
+(*  Ver.: 17.02.2021                                                          *)
 (*  https://kandiral.ru/delphi/krmodbusclient.pas.html                        *)
 (*                                                                            *)
 (******************************************************************************)
@@ -1285,7 +1285,7 @@ begin
   FFileProcess:=1;
   FFileName:=AFileName;
   FFileDo:=1;
-  UpdateValue;
+  UpdateValueRequest;
 end;
 
 function TKRMBRegister.FileDeleteAsinc(AFileName: String): boolean;
@@ -1302,7 +1302,7 @@ begin
   FFileName:=AFileName;
   FFileData:=AFileInfo;
   FFileDo:=4;
-  UpdateValue;
+  UpdateValueRequest;
 end;
 
 function TKRMBRegister.FileInfoAsinc(AFileName: String; AFileInfo: PKRMBRegFileInfo): boolean;
@@ -1344,7 +1344,7 @@ begin
   FFilePC:=AFile;
   FFileDo:=2;
   FFilePC.Size:=0;
-  UpdateValue;
+  UpdateValueRequest;
 end;
 
 function TKRMBRegister.FileReadAsinc(AFileName: String;
@@ -1578,7 +1578,7 @@ begin
   FFileName:=AFileName;
   FFileData:=AFileSize;
   FFileDo:=5;
-  UpdateValue;
+  UpdateValueRequest;
 end;
 
 function TKRMBRegister.FileSizeAsinc(AFileName: String;
@@ -1597,7 +1597,7 @@ begin
   FFilePC:=AFile;
   FFilePC.Position:=0;
   FFileDo:=3;
-  UpdateValue;
+  UpdateValueRequest;
 end;
 
 function TKRMBRegister.FileWriteAsinc(AFileName: String;
@@ -2258,6 +2258,7 @@ end;
 
 procedure TKRMBRegister.UpdateValueRequest;
 begin
+  inherited;
   FTmpArray.len:=0;
   case FMCVarType of
     MCT_DWSTR: DWSTR_up($3000000);
@@ -2430,13 +2431,13 @@ procedure TKRMBRegister._ParamChange(AParam: TKRIniCfgParam);
 begin
   inherited;
   if Assigned(CfgReadFunc) and (CfgReadFunc.Name=AParam.Name) then begin
-    if CfgReadFunc.Value=0 then FReadFunction:=mbrfReadHoldingRegisters else FReadFunction:=mbrfReadInputRegisters;
+    if CfgReadFunc.Value=0 then ReadFunction:=mbrfReadHoldingRegisters else ReadFunction:=mbrfReadInputRegisters;
   end;
   if Assigned(CfgWriteFunc) and (CfgWriteFunc.Name=AParam.Name) then begin
-    if CfgWriteFunc.Value=0 then FWriteFunction:=mbwfWriteHoldingRegister else FWriteFunction:=mbwfWriteHoldingRegisters;
+    if CfgWriteFunc.Value=0 then WriteFunction:=mbwfWriteHoldingRegister else WriteFunction:=mbwfWriteHoldingRegisters;
   end;
   if Assigned(CfgRegisterIndex) and (CfgRegisterIndex.Name=AParam.Name) then begin
-    FIndex:=CfgRegisterIndex.Value;
+    RegisterIndex:=CfgRegisterIndex.Value;
   end;
 end;
 

@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRModbusMaster                                                            *)
-(*  Ver.: 23.08.2020                                                          *)
+(*  Ver.: 04.03.2021                                                          *)
 (*  https://kandiral.ru/delphi/krmodbusmaster.pas.html                        *)
 (*                                                                            *)
 (******************************************************************************)
@@ -410,7 +410,7 @@ begin
   BytesFromWord(AStartCoil,ABuffer^[AFrom+3],ABuffer^[AFrom+2]);
   BytesFromWord(ACount,ABuffer^[AFrom+5],ABuffer^[AFrom+4]);
   ABuffer^[AFrom+6]:=cnt;
-  for I := 0 to cnt-1 do ABuffer^[AFrom+7+1]:=AData[i];
+  for I := 0 to cnt-1 do ABuffer^[AFrom+7+i]:=AData[i];
   Result:=7+cnt;
   ARecvLen:=6;
 end;

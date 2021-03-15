@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRWindows                                                                 *)
-(*  Ver.: 04.04.2019                                                          *)
+(*  Ver.: 08.02.2021                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -213,7 +213,7 @@ begin
   Result:=KRCmd(ACmd,ATimeout,el);
 end;
 
-function KRCmd(ACmd: String; ATimeout: Byte; out ErrorLevel: Cardinal): String;overload;
+function KRCmd(ACmd: String; ATimeout: Byte; out ErrorLevel: Cardinal): String; overload;
 var
   cmdLine: String;
   sa: TSecurityAttributes;

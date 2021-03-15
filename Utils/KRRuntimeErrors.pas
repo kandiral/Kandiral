@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRRuntimeErrors                                                           *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 09.03.2021                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -25,7 +25,8 @@ type
     AException: Exception);
 
   procedure REAddLog(AText: String);
-  procedure REAddLogS(AText: String);
+  procedure REAddLogA(AText: AnsiString);
+  procedure REAddLogW(AText: String);
 
 var
   KRRuntimeErrorCS: TCriticalSection;
@@ -80,7 +81,7 @@ begin
   end;
 end;
 
-procedure REAddLogS(AText: String);
+procedure REAddLogA(AText: AnsiString);
 var
   fs: TFileStream;
   s: AnsiString;
@@ -94,8 +95,32 @@ begin
       end else
         fs:=TFileStream.Create(KRRELogFile,fmCreate);
       try
-        s:=AnsiString(FormatDateTime(KRRELogDateFormat, NOW)+'    '+AText)+#$D#$A;
+        s := AnsiString( FormatDateTime( KRRELogDateFormat, NOW) ) + '    ' + AText + #$D#$A;
         fs.WriteBuffer(s[1],Length(s));
+      finally
+        fs.Free;
+      end;
+    except end;
+    RECS_Leave;
+  end;
+end;
+
+procedure REAddLogW(AText: String);
+var
+  fs: TFileStream;
+  s: String;
+begin
+  if KRRELogFile<>'' then begin
+    RECS_Enter;
+    try
+      if FileExists(KRRELogFile) then begin
+        fs:=TFileStream.Create(KRRELogFile,fmOpenWrite);
+        fs.Seek(0, soFromEnd);
+      end else
+        fs:=TFileStream.Create(KRRELogFile,fmCreate);
+      try
+        s := FormatDateTime(KRRELogDateFormat, NOW)+'    '+AText+#$D#$A;
+        fs.WriteBuffer( s[1], Length(s) shl 1);
       finally
         fs.Free;
       end;

@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRCheckGroupBox                                                           *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 06.02.2021                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -285,14 +285,16 @@ begin
       with CaptionRect do ExcludeClipRect(Handle, Left, Top, Right, Bottom);
       if Enabled then Box := tbGroupBoxNormal
       else Box := tbGroupBoxDisabled;
-      {$IFDEF VER220}
-        Details := ThemeServices.GetElementDetails(Box);
-        ThemeServices.DrawElement(Handle, Details, OuterRect);
-      {$ELSE}
-        Details := StyleServices.GetElementDetails(Box);
-        StyleServices.DrawElement(Handle, Details, OuterRect);
-      {$ENDIF}
+      {$IF CompilerVersion >= 23}
+      Details := StyleServices.GetElementDetails(Box);
+      StyleServices.DrawElement(Handle, Details, OuterRect);
       SelectClipRgn(Handle, 0);
+      Brush.Style := bsClear;
+      {$ELSE}
+      Details := ThemeServices.GetElementDetails(Box);
+      ThemeServices.DrawElement(Handle, Details, OuterRect);
+      SelectClipRgn(Handle, 0);
+      {$IFEND}
     end else begin
       H := TextHeight('0');
       R := Rect(0, H div 2 - 1, Width, Height);
@@ -306,17 +308,6 @@ begin
       end else
         Brush.Color := clWindowFrame;
       FrameRect(R);
-{      if Text <> '' then
-      begin
-        if not UseRightToLeftAlignment then
-          R := Rect(8, 0, 0, H)
-        else
-          R := Rect(R.Right - Canvas.TextWidth(Text) - 8, 0, 0, H);
-        Flags := DrawTextBiDiModeFlags(DT_SINGLELINE);
-        DrawText(Handle, Text, Length(Text), R, Flags or DT_CALCRECT);
-        Brush.Color := Color;
-        DrawText(Handle, Text, Length(Text), R, Flags);
-      end;  }
     end;
   end;
 end;

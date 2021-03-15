@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRCOMPortSets                                                             *)
-(*  Ver.: 31.08.2017                                                          *)
+(*  Ver.: 17.01.2021                                                          *)
 (*  https://kandiral.ru/delphi/krcomportsets.pas.html                         *)
 (*                                                                            *)
 (******************************************************************************)

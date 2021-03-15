@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRPenStyle                                                                *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 06.02.2021                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -63,6 +63,7 @@ type
     property Enabled;
     property ImeMode;
     property ImeName;
+    property ItemHeight;
     property ParentBiDiMode;
     property ParentColor;
     property ParentCtl3D;

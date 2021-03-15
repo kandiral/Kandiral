@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRConnector                                                               *)
-(*  Ver.: 23.08.2020                                                          *)
+(*  Ver.: 18.02.2021                                                          *)
 (*  https://kandiral.ru/delphi/krconnector.pas.html                           *)
 (*                                                                            *)
 (******************************************************************************)
@@ -168,6 +168,7 @@ begin
   FThread.FReconnectTime:=FReconnectTime;
   FThread.FInterval:=FInterval;
   FThread.FLastConnectTime:=getTickCount-FReconnectTime-1;
+  ResetEvent(FInPackEvent)
 end;
 
 destructor TKRConnector.Destroy;

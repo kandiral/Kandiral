@@ -82,7 +82,8 @@ contains
   lgop in '..\..\Utils\lgop.pas',
   uLkJSON in '..\..\Utils\uLkJSON.pas',
   KRBase64 in '..\..\Crypting\KRBase64.pas',
-  ISO3166 in '..\..\ISO\ISO3166.pas';
+  ISO3166 in '..\..\ISO\ISO3166.pas',
+  KRKernel32 in '..\..\Windows\KRKernel32.pas';
 
 end.
 

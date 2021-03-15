@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  funcs                                                                     *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 01.02.2021                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -31,7 +31,6 @@ type
   function ArrayOfCharToStr(AArrayOfChar: PChar; ALength: integer): String;
   procedure StrToArrayOfChar(AArrayOfChar: PChar; ALength: integer; AStr: String);
   function sourceToHex(buf: PAnsiChar; len: integer): String;
-  function Explode(const delim, str: string): TStringList;
   function Implode(const delim: String; strlist: TStrings): String;
   procedure SortArray(_array: TIntArray; _desc: boolean = false);
   procedure SortStrings(AStrings: TStrings; _desc: boolean = false);
@@ -40,13 +39,9 @@ type
   function decdt(d: TDateTime): integer;
   function DWORDToHex(ANum: DWORD;ACnt: Integer):String;
   function DWordToStr(dw: DWORD):String;
-  function StrToDWord(S: String;out dw: DWORD):boolean;
-  function StrToDWordDef(S: String;def: DWORD):DWORD;
   function parseNum(num: integer; s0,s1,s2:String):String;
   function DateTimeToMKTime(d: TDateTime): DWORD;
   function MKTimeToDateTime(d: DWORD): TDateTime;
-  function IsNumber(Text:String;var vl: integer):boolean;
-  function IsIP(Text:String):boolean;
   procedure GetComPorts(aList: TStrings; aNameStart: string);
   function GetNextSubstring(aBuf: string; var aStartPos: integer): string;
   function StartsStr(const APrefix : String; const ASource : String): Boolean;
@@ -57,7 +52,6 @@ type
   function PHPTimeToDateTime(tm: cardinal): TDateTime;
   function DateTimeToPHPTime(d: TDateTime): cardinal;
   function ISOTransliterate(AText: String):String;
-  function IntToStrL(ANum,ACnt: Integer):String;
   procedure AppDelay(AMSec: Cardinal);
   function CTL_CODE(ADeviceType, AFunction, AMethod, AAccess: Cardinal ): Cardinal;
   function WideStringToString(const ws: WideString; codePage: Word): AnsiString;
@@ -88,28 +82,8 @@ type
   function ChangeFileDate(Dir: string; ALastAccessTime, ACreationTime, ALastWriteTime: {$IF CompilerVersion >= 23}Winapi.{$IFEND}Windows._FILETIME): boolean;overload;
   function ChangeFileDate(Dir: string; ALastAccessTime, ACreationTime, ALastWriteTime: TDateTime): boolean;overload;
   function ReadFileDate(Dir: string; var ALastAccessTime, ACreationTime, ALastWriteTime: {$IF CompilerVersion >= 23}Winapi.{$IFEND}Windows._FILETIME): boolean;overload;
-  function LSwap(c:cardinal):cardinal;
-  function TzSpecificLocalTimeToSystemTime(lpTimeZoneInformation: PTimeZoneInformation; var lpLocalTime, lpUniversalTime: TSystemTime): BOOL; stdcall;
-  function SystemTimeToTzSpecificLocalTime(lpTimeZoneInformation: PTimeZoneInformation; var lpUniversalTime,lpLocalTime: TSystemTime): BOOL; stdcall;
-  function FastHexCharToVal(ACh: Char): byte;
-  function FastValToHexChar(AVal: Byte): Char;
 
 implementation
-
-function TzSpecificLocalTimeToSystemTime; external kernel32 name 'TzSpecificLocalTimeToSystemTime';
-function SystemTimeToTzSpecificLocalTime; external kernel32 name 'SystemTimeToTzSpecificLocalTime';
-
-function FastHexCharToVal(ACh: Char): byte;
-var bt: byte;
-begin
-  bt:=Ord(ACh);
-  if bt>57 then Result:=bt-55 else Result:=bt-48;
-end;
-
-function FastValToHexChar(AVal: Byte): Char;
-begin
-  if AVal>9 then Result:=Chr(AVal+55) else Result:=Chr(AVal+48)
-end;
 
 function CryptString(Const  Input: string; password : AnsiString;  Encrypt: Boolean) : string;
 const
@@ -216,11 +190,6 @@ begin
   finally
     CryptReleaseContext(CRYPTPROV, 0);
   end;
-end;
-
-function LSwap(c:cardinal):cardinal;
-begin
- Result:=swap(c shr 16)+swap(c) shl 16;
 end;
 
 function ReadFileDate(Dir: string; var ALastAccessTime, ACreationTime, ALastWriteTime: {$IF CompilerVersion >= 23}Winapi.{$IFEND}Windows._FILETIME): boolean;overload;
@@ -766,12 +735,6 @@ begin
   while Length(Result)<ACnt do Result:='0'+Result;
 end;
 
-function IntToStrL(ANum,ACnt: Integer):String;
-begin
-  Result:=IntToStr(ANum);
-  while Length(Result)<ACnt do Result:='0'+Result;
-end;
-
 function PHPTimeToDateTime(tm: cardinal): TDateTime;
 var
   SystemTime: TSystemTime;
@@ -899,36 +862,6 @@ begin
   if Result='' then Result:='0';  
 end;
 
-function StrToDWord(S: String;out dw: DWORD):boolean;
-var
-  i,n,k : integer;
-  dw0: dword;
-  bt0: byte;
-begin
-  Result:=false;
-  if(Length(s)>0)and(Length(s)<11)then begin
-    dw0:=0;//4294967295
-    k:=0;
-    for i:=length(s) downto 1 do begin
-      if not IsNumber(s[i],n) then exit;
-      bt0:=Ord(s[i])-48;
-      if(length(s)=10)and(i=1)then begin
-        if bt0>4 then exit;
-        if(bt0=4)and(dw0>294967295)then exit;
-      end;
-      dw0:=dw0+bt0*Pow10(k);
-      Inc(k);
-    end;
-    dw:=dw0;
-    Result:=true;
-  end;
-end;
-
-function StrToDWordDef(S: String;def: DWORD):DWORD;
-begin
-  if not StrToDWord(S,Result) then Result:=def;
-end;
-
 function decdt(d: TDateTime): integer;
 begin
   Result:=Trunc((d-25569)*86400.000001);
@@ -939,26 +872,6 @@ var i: integer;
 begin
   result:='';
   for i:=0 to len-1 do result:=result+IntToHex(Ord(buf[i]),2)+' ';
-end;
-
-function Explode(const delim, str: string): TStringList;
-var offset: integer;
-    cur: integer;
-    dl: integer;
-begin
-  Result:=TStringList.Create;
-  dl:=Length(delim);
-  offset:=1;
-  while True do begin
-      cur:=PosEx(delim, str, offset);
-      if cur > 0 then
-          Result.Add(Copy(str, offset, cur - offset))
-      else begin
-          Result.Add(Copy(str, offset, Length(str) - offset + 1));
-          Break
-      end;
-      offset:=cur + dl;
-  end;
 end;
 
 function Implode(const delim: String; strlist: TStrings): String;
@@ -1026,45 +939,12 @@ begin
 Result := (a and 15) or (b shl 4)
 end;
 
-function IsNumber(Text:String;var vl: integer):boolean;
-var
-  e:integer;
-begin
-  Val(Text,vl,e);
-  if e=0 then result:=true else result:=false;
-end;
-
 function SubStrCnt(Text,character:string):integer;
 begin
   result := 0;
   while Pos(Character,Text) <> 0 do begin
     Result := Result + 1;
     Text := Copy(Text,0,Pos(Character,Text)-1)+Copy(Text,Pos(Character,Text)+1,Length(Text));
-  end;
-end;
-
-function IsIP(Text:String):boolean;
-var
-  sl: TStringList;
-  vl,i: integer;
-begin
-  Result:=false;
-  sl:=Explode('.',Text);
-  try
-    if sl.Count=4 then begin
-      Result:=true;
-      for i:=0 to 3 do
-        if not IsNumber(sl[i],vl) then begin
-          result:=false;
-          break;
-        end else
-          if(vl<0)or(vl>255)then begin
-            result:=false;
-            break;
-          end;
-    end;
-  finally
-    sl.free;
   end;
 end;
 

@@ -85,6 +85,7 @@ contains
   KRLogical in '..\..\Utils\KRLogical.pas',
   KRMsgBox in '..\..\Utils\KRMsgBox.pas',
   KRUtils in '..\..\Utils\KRUtils.pas',
-  KRVariants in '..\..\Utils\KRVariants.pas';
+  KRVariants in '..\..\Utils\KRVariants.pas',
+  KRKernel32 in '..\..\Windows\KRKernel32.pas';
 
 end.

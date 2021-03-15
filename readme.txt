@@ -34,6 +34,7 @@ C:\Delphi\Kandiral\
 	$(KANDIRAL)\Net
 	$(KANDIRAL)\Utils
 	$(KANDIRAL)\Web
+	$(KANDIRAL)\Windows
 5. Открываем одну из групп проектов, которая соответствует вашей версии Delphi. Имя файла группы проектов имеет следующий вид Kandiral150.groupproj. Где 150 - это Package Version (подробнее см. тут http://docwiki.embarcadero.com/RADStudio/Seattle/en/Compiler_Versions).
         Kandiral150.groupproj        Delphi XE
         Kandiral160.groupproj        Delphi XE2
@@ -55,8 +56,8 @@ C:\Delphi\Kandiral\
 
 ----------------
 Library path:
-$(KANDIRAL)\Release\$(ProductVersion)\$(Platform);$(KANDIRAL)\Resources;$(KANDIRAL)\dfm;$(JEDI)\jwa\branches\2.3\Common;$(JEDI)\jwa\branches\2.3\Includes;$(JEDI)\jwa\branches\2.3\SaCMAPI;$(JEDI)\jwa\branches\2.3\Win32API
+$(JEDI)\jwa\branches\2.3\Common;$(JEDI)\jwa\branches\2.3\Includes;$(JEDI)\jwa\branches\2.3\SaCMAPI;$(JEDI)\jwa\branches\2.3\Win32API;$(KANDIRAL)\Release\$(ProductVersion)\$(Platform);$(KANDIRAL)\Resources;$(KANDIRAL)\dfm
 
 Browsing path:
-$(KANDIRAL)\Automation;$(KANDIRAL)\Common;$(KANDIRAL)\Crypting;$(KANDIRAL)\File;$(KANDIRAL)\Graphics;$(KANDIRAL)\ISO;$(KANDIRAL)\Media;$(KANDIRAL)\Net;$(KANDIRAL)\Utils;$(KANDIRAL)\Web
+$(KANDIRAL)\Automation;$(KANDIRAL)\Common;$(KANDIRAL)\Crypting;$(KANDIRAL)\File;$(KANDIRAL)\Graphics;$(KANDIRAL)\ISO;$(KANDIRAL)\Media;$(KANDIRAL)\Net;$(KANDIRAL)\Utils;$(KANDIRAL)\Web;$(KANDIRAL)\Windows
 

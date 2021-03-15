@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRVarLabel                                                                *)
-(*  Ver.: 16.09.2019                                                          *)
+(*  Ver.: 06.02.2021                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -38,6 +38,7 @@ type
     FOldValue: Variant;
     FOldError: integer;
     FOutFunction: TKREmptyEvent;
+    FShowValue: TKRFieldValueEvent;
     procedure WMFontChange(var Message: TMessage); message WM_FONTCHANGE;
     function GetCaption_: TCaption;
     procedure SetColor(const Value: TColor);
@@ -134,6 +135,7 @@ type
     property OnMouseUp;
     property OnMouseEnter;
     property OnMouseLeave;
+    property OnShowValue: TKRFieldValueEvent read FShowValue write FShowValue;
     property OnStartDock;
     property OnStartDrag;
   end;
@@ -185,6 +187,8 @@ begin
       inherited Color:=FErrorColor;
       Font.Color:=FErrorFontColor;
     end;
+
+    if Assigned(FShowValue) then FShowValue(Self,FOldValue);
 
     FOutFunction;
     if FVarUnit<>'' then inherited Caption:=Caption+' '+FVarUnit;

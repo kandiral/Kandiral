@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRGoogleContacts                                                          *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 14.03.2021                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -12,22 +12,27 @@ unit KRGoogleContacts;
 
 interface
 
+{$DEFINE GOOGLE_API_LOGS}
+
 uses
   {$IF CompilerVersion >= 23}
     Winapi.Windows, System.Classes, System.SysUtils, System.StrUtils, Vcl.Dialogs,
     Xml.XMLDoc, Xml.XMLIntf, Winapi.ActiveX, System.Variants, Vcl.Graphics,
-    Vcl.Imaging.pngimage,
+    Vcl.Imaging.pngimage, System.IniFiles,
   {$ELSE}
     Windows, Classes, SysUtils, StrUtils, Dialogs, XMLDoc, XMLIntf, ActiveX,
-    Variants, Graphics, PngImage,
+    Variants, Graphics, PngImage, IniFiles,
   {$IFEND}
-    IdHTTP, IdSSL, IdSSLOpenSSL, IdCompressorZLib, IdLogEvent,
-    KRGoogleAuth, KRThread, KRRuntimeErrors,
-    ISO3166, Funcs;
+
+    KRIdHTTP, KRGoogleAPI, KRGoogleCommon, KRWebCommon,
+
+    KRGoogleAuth, KRThread, KRStrUtils, KRWebDownload,
+    ISO3166;
 
 type
   TKRGoogleContacts = class;
   TGoogleContact = class;
+  TKRGoogleContactsGroup = class;
 
   TGoogleContactPostalAddressType = (gpatWork, gpatHome, gpatOther);
   TGoogleContactPostalAddress = class
@@ -141,17 +146,31 @@ type
   TGoogleContactPhoto = class
   private
     contact: TGoogleContact;
-    FETag, Fhref, FURL,_etag: String;
-    bmp: TBitmap;
+    FETag, Fhref, _etag: String;
     function getBitmap: TBitmap;
     procedure setBitmap(const Value: TBitmap);
     function DeleteDo(AThread: TThread; AData: Pointer): Pointer;
     function LoadDo(AThread: TThread; AData: Pointer): Pointer;
+    function SetPhotoDo(AThread: TThread; AData: Pointer): Pointer;
     function getEtagDo(AThread: TThread; AData: Pointer): Pointer;
+    function thLoadIcon(AThread: TThread; AData: Pointer): Pointer;
   public
     procedure Assign(APhoto: TGoogleContactPhoto);
-    destructor Destroy; override;
-    property Bitmap: TBitmap read getBitmap write setBitmap;
+    property ETag: String read FETag;
+    //property Bitmap: TBitmap read getBitmap write setBitmap;
+    function SetPhoto( AFileName: TFileName ): boolean;
+  end;
+
+  TGoogleContactWebSite = class
+  private
+    contact: TGoogleContact;
+    FSiteLabel: String;
+    FHref: String;
+    procedure SetHref(const Value: String);
+    procedure SetSiteLabel(const Value: String);
+  public
+    property Href: String read FHref write SetHref;
+    property SiteLabel: String read FSiteLabel write SetSiteLabel;
   end;
 
   TGoogleContactName = class
@@ -180,16 +199,17 @@ type
   TGoogleContact = class(TObject)
   private
     contacts: TKRGoogleContacts;
-    FID, FID_, FETag, fxml, FURL: String;
+    FChecked: boolean;
+    FID, FID_, FETag, fxml: String;
     FName: TGoogleContactName;
     FPhoto: TGoogleContactPhoto;
     FUpdated: TDateTime;
     FModified: boolean;
 
-    FEmailList, FPhoneList, FOrganizationList, FPostalAddressList: TList;
+    FEmailList, FPhoneList, FOrganizationList, FPostalAddressList, FWebSiteList: TList;
     FNotes: String;
-    FGroupID: String;
     FDeleted: boolean;
+    FGroups: TStringList;
     function GetEmailCount: integer;
     function GetEmail(AIndex: Integer): TGoogleContactEMail;
     function GetPhone(AIndex: Integer): TGoogleContactPhone;
@@ -202,19 +222,27 @@ type
     function GetOrganizationCount: integer;
     function GetPostalAddress(AIndex: Integer): TGoogleContactPostalAddress;
     function GetPostalAddressCount: integer;
-    procedure SetGroupID(const Value: String);
+    function GetGroups(Index: integer): String;
+    function GetGroupsCount: integer;
+    function GetWebSite(AIndex: Integer): TGoogleContactWebSite;
+    function GetWebSiteCount: integer;
   public
     constructor Create;
     destructor Destroy; override;
     procedure Assign(AContact: TGoogleContact);
     property ContactsList: TKRGoogleContacts read contacts;
     property isModified: boolean read FModified;
+    property ETag: String read FETag;
     function Update: boolean;
     function Retrieve: boolean;
     property id: String read FID;
     property isDeleted: boolean read FDeleted;
     property Updated: TDateTime read FUpdated;
-    property GroupID: String read FGroupID write SetGroupID;
+    function InGroup( AGroup: TKRGoogleContactsGroup ): boolean;
+    property Groups[Index: integer ]: String read GetGroups;
+    property GroupsCount: integer read GetGroupsCount;
+    procedure GroupAdd( AGroup: TKRGoogleContactsGroup );
+    procedure GroupDel( AIndex: Integer );
     property Name: TGoogleContactName read FName;
     property Notes: String read FNotes write SetNotes;
     property Photo: TGoogleContactPhoto read FPhoto;
@@ -223,6 +251,12 @@ type
     function EmailAdd(AAddress: String; ARel: TGoogleContactEMailType;
       ADisplayName: String = ''; ALabel: String = ''): TGoogleContactEMail;
     procedure EmailDelete(AIndex: integer);
+
+    property WebSiteCount: integer read GetWebSiteCount;
+    property WebSites[AIndex: Integer]: TGoogleContactWebSite read GetWebSite;
+    function WebSiteAdd(AHref: String; ALabel: String = ''): TGoogleContactWebSite;
+    procedure WebSiteDelete(AIndex: integer);
+
     property PhoneCount: integer read GetPhoneCount;
     property Phones[AIndex: Integer]: TGoogleContactPhone read GetPhone;
     function PhoneAdd(APhone: String; ARel: TGoogleContactPhoneType;
@@ -243,7 +277,7 @@ type
   TKRGoogleContactsGroup = class
   private
     contacts: TKRGoogleContacts;
-    FID, FID_, FETag, fxml, FURL: String;
+    FID, FID_, FETag, fxml: String;
     FUpdated: TDateTime;
     FTitle: String;
     FSystemGroup: boolean;
@@ -264,42 +298,36 @@ type
     function Retrieve: boolean;
   end;
 
-  TKRGoogleContacts = class(TComponent)
+  TKRGoogleContacts = class( TKRGoogleAPI )
   private
-    FGoogleAuth: TKRGoogleAuth;
-    FURL: String;
-    FContacts, FContactsTmp: TList;
+    FContacts: TList;
     FGroups, FGroupsTmp: TList;
-    FIdLogs: TIdLogEvent;
     FEMailID: String;
     FRetrievingDeleted: boolean;
-    procedure SetGoogleAuth(const Value: TKRGoogleAuth);
+    FDataFolder: TFileName;
     function GetCount: integer;
     function RetrievingAllDo(AThread: TThread; AData: Pointer): Pointer;
     function RetrievingGroupsDo(AThread: TThread; AData: Pointer): Pointer;
     function DeleteDo(AThread: TThread; AData: Pointer): Pointer;
     function GroupDeleteDo(AThread: TThread; AData: Pointer): Pointer;
     function GetContact(Index: integer): TGoogleContact;
-    procedure logRecv(ASender: TComponent; const AText, AData: string);
-    procedure logSend(ASender: TComponent; const AText, AData: string);
-    procedure logStat(ASender: TComponent; const AText: string);
-    procedure AddLog(AText: STring);
     procedure parseUserData(entry: IXMLNode; cntct: TGoogleContact);
     procedure userDataToXml(AXML: String; cntct: TGoogleContact; AStream: TStream);
     procedure parseGroupData(entry: IXMLNode; grp: TKRGoogleContactsGroup);
     procedure groupDataToXml(AXML: String; grp: TKRGoogleContactsGroup; AStream: TStream);
-    function getHTTP: TIdHTTP;
-    procedure checkError(e: EIdHTTPProtocolException);
     function GetGroup(AIndex: Integer): TKRGoogleContactsGroup;
     function GetGroupCount: integer;
+    procedure SetGoogleAuth(const Value: TKRGoogleAuth);
+    procedure SetDataFolder(const Value: TFileName);
   protected
-    procedure Notification(AComponent: TComponent; Operation: TOperation); override;
+    function HTTPCreate: TKRIdHTTP; override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    property DataFolder: TFileName read FDataFolder write SetDataFolder;
 
     property RetrievingDeleted: boolean read FRetrievingDeleted write FRetrievingDeleted;
-    function RetrievingAll: integer;
+    function RetrievingAll: boolean;
     procedure UpdateModified;
     function Add: TGoogleContact;
     function Delete(AContact: TGoogleContact): boolean;overload;
@@ -307,64 +335,16 @@ type
     property Count: integer read GetCount;
     property Contacts[Index: integer]: TGoogleContact read GetContact;
 
-    function RetrievingGroups: integer;
+    function RetrievingGroups: boolean;
     property GroupCount: integer read GetGroupCount;
     property Groups[AIndex: Integer]: TKRGoogleContactsGroup read GetGroup;
     function GroupAdd(ATitle: String): TKRGoogleContactsGroup;
     function GroupDelete(AGroup: TKRGoogleContactsGroup): boolean;overload;
     function GroupDelete(AIndex: integer): boolean;overload;
 
-  published
-    property GoogleAuth: TKRGoogleAuth read FGoogleAuth write SetGoogleAuth;
   end;
 
 implementation
-
-function HTTPEncode(const AStr: AnsiString): AnsiString;
-// The NoConversion set contains characters as specificed in RFC 1738 and
-// should not be modified unless the standard changes.
-const
-  NoConversion = ['A'..'Z','a'..'z','*'{,'@'},'.','_','-',
-                  '0'..'9','$','!','''','(',')'];
-var
-  Sp, Rp: PAnsiChar;
-begin
-  SetLength(Result, Length(AStr) * 3);
-  Sp := PAnsiChar(AStr);
-  Rp := PAnsiChar(Result);
-  while Sp^ <> #0 do
-  begin
-    if Sp^ in NoConversion then
-      Rp^ := Sp^
-    else
-      {if Sp^ = ' ' then
-        Rp^ := '+'
-      else}
-      begin
-        FormatBuf(Rp^, 3, AnsiString('%%%.2x'), 6, [Ord(Sp^)]);
-        Inc(Rp,2);
-      end;
-    Inc(Rp);
-    Inc(Sp);
-  end;
-  SetLength(Result, Rp - PAnsiChar(Result));
-end;
-
-function DateTimeTOgcDate(adt: TDateTime): String;
-var
-  yy,mm,dd,hh,mn,ss,ms: Word;
-  SystemTime: TSystemTime;
-  _d: TDateTime;
-begin
-  GetSystemTime(SystemTime);
-  with SystemTime do
-    _d:=EncodeDate(wYear, wMonth, wDay)+EncodeTime(wHour, wMinute, wSecond, wMilliseconds)-now;
-  DecodeDate(adt+_d,yy,mm,dd);
-  DecodeTime(adt+_d,hh,mn,ss,ms);
-  Result:=IntToStrL(yy,4)+'-'+IntToStrL(mm,2)+'-'+IntToStrL(dd,2)+'T'+
-    IntToStrL(hh,2)+':'+IntToStrL(mn,2)+':'+IntToStrL(ss,2)+'.'+
-    IntToStrL(ms,3)+'Z';
-end;
 
 function gcDateToDateTime(adt: String): TDateTime;
 var
@@ -377,22 +357,20 @@ begin
   GetSystemTime(SystemTime);
   with SystemTime do
     _d:=EncodeDate(wYear, wMonth, wDay)+EncodeTime(wHour, wMinute, wSecond, wMilliseconds)-now;
-  sl:=Funcs.Explode('T',adt);
+  sl:=TStringList.Create;
+  KRSplitStr(adt,'T',sl);
   dt:=sl[0];
   tm:=sl[1];
-  sl.Free;
-  sl:=Funcs.Explode('-',dt);
+  KRSplitStr(dt,'-',sl);
   yy:=StrToInt(sl[0]);
   mm:=StrToInt(sl[1]);
   dd:=StrToInt(sl[2]);
-  sl.Free;
-  sl:=Funcs.Explode(':',tm);
+  KRSplitStr(tm,':',sl);
   hh:=StrToInt(sl[0]);
   mn:=StrToInt(sl[1]);
   tm:=sl[2];
-  sl.Free;
   if tm[Length(tm)]='Z' then tm:=copy(tm,1,Length(tm)-1);
-  sl:=Funcs.Explode('.',tm);
+  KRSplitStr(tm,'.',sl);
   ss:=StrToInt(sl[0]);
   if sl.Count>1 then ms:=StrToInt(sl[1]) else ms:=0;
   sl.Free;
@@ -402,17 +380,21 @@ end;
 function gcStrToEmailType(rel: String): TGoogleContactEMailType;
 begin
   result:=gmtOther;
-  if(SameText(rel,'http://schemas.google.com/g/2005#home'))then result:=gmtHome
-  else if(SameText(rel,'http://schemas.google.com/g/2005#work'))then result:=gmtWork;
+  if(rel='http://schemas.google.com/g/2005#home')then result:=gmtHome
+  else if(rel='http://schemas.google.com/g/2005#work')then result:=gmtWork;
 end;
 
-function EmailTypeTOgcStr(tp: TGoogleContactEMailType): String;
+function gcStrToOrganizationType(rel: String): TGoogleContactOrganizationType;
 begin
-  result:='http://schemas.google.com/g/2005#other';
-  case tp of
-    gmtHome: result:='http://schemas.google.com/g/2005#home';
-    gmtWork: result:='http://schemas.google.com/g/2005#work';
-  end;
+  result:=gotOther;
+  if(SameText(rel,'http://schemas.google.com/g/2005#work'))then result:=gotWork;
+end;
+
+function gcStrToPostalAddressType(rel: String): TGoogleContactPostalAddressType;
+begin
+  result:=gpatOther;
+  if(SameText(rel,'http://schemas.google.com/g/2005#work'))then result:=gpatWork
+  else if(SameText(rel,'http://schemas.google.com/g/2005#home'))then result:=gpatHome;
 end;
 
 function gcStrToPhoneType(rel: String): TGoogleContactPhoneType;
@@ -437,6 +419,15 @@ begin
   else if(SameText(rel,'http://schemas.google.com/g/2005#work_fax'))then result:=gptWorkFax
   else if(SameText(rel,'http://schemas.google.com/g/2005#work_mobile'))then result:=gptWorkMobile
   else if(SameText(rel,'http://schemas.google.com/g/2005#work_pager'))then result:=gptWorkPager
+end;
+
+function EmailTypeTOgcStr(tp: TGoogleContactEMailType): String;
+begin
+  result:='http://schemas.google.com/g/2005#other';
+  case tp of
+    gmtHome: result:='http://schemas.google.com/g/2005#home';
+    gmtWork: result:='http://schemas.google.com/g/2005#work';
+  end;
 end;
 
 function PhoneTypeTOgcStr(tp: TGoogleContactPhoneType): String;
@@ -465,25 +456,6 @@ begin
   end;
 end;
 
-function gcStrToOrganizationType(rel: String): TGoogleContactOrganizationType;
-begin
-  result:=gotOther;
-  if(SameText(rel,'http://schemas.google.com/g/2005#work'))then result:=gotWork;
-end;
-
-function OrganizationTypeTOgcStr(rel: TGoogleContactOrganizationType): String;
-begin
-  result:='http://schemas.google.com/g/2005#other';
-  if(rel=gotWork)then result:='http://schemas.google.com/g/2005#work';
-end;
-
-function gcStrToPostalAddressType(rel: String): TGoogleContactPostalAddressType;
-begin
-  result:=gpatOther;
-  if(SameText(rel,'http://schemas.google.com/g/2005#work'))then result:=gpatWork
-  else if(SameText(rel,'http://schemas.google.com/g/2005#home'))then result:=gpatHome;
-end;
-
 function PostalAddressTypeTOgcStr(rel: TGoogleContactPostalAddressType): String;
 begin
   result:='http://schemas.google.com/g/2005#other';
@@ -493,6 +465,28 @@ begin
   end;
 end;
 
+function OrganizationTypeTOgcStr(rel: TGoogleContactOrganizationType): String;
+begin
+  result:='http://schemas.google.com/g/2005#other';
+  if(rel=gotWork)then result:='http://schemas.google.com/g/2005#work';
+end;
+
+function DateTimeTOgcDate(adt: TDateTime): String;
+var
+  yy,mm,dd,hh,mn,ss,ms: Word;
+  SystemTime: TSystemTime;
+  _d: TDateTime;
+begin
+  GetSystemTime(SystemTime);
+  with SystemTime do
+    _d:=EncodeDate(wYear, wMonth, wDay)+EncodeTime(wHour, wMinute, wSecond, wMilliseconds)-now;
+  DecodeDate(adt+_d,yy,mm,dd);
+  DecodeTime(adt+_d,hh,mn,ss,ms);
+  Result:=KRIntToStrL(yy,4)+'-'+KRIntToStrL(mm,2)+'-'+KRIntToStrL(dd,2)+'T'+
+    KRIntToStrL(hh,2)+':'+KRIntToStrL(mn,2)+':'+KRIntToStrL(ss,2)+'.'+
+    KRIntToStrL(ms,3)+'Z';
+end;
+
 { TKRGoogleContacts }
 
 function TKRGoogleContacts.Add: TGoogleContact;
@@ -500,49 +494,34 @@ begin
   Result:=TGoogleContact.Create;
   Result.FModified:=true;
   Result.contacts:=self;
-  Result.FGroupID:='6';
+  Result.FGroups.Add( '6' );
   FContacts.Add(result);
-end;
-
-procedure TKRGoogleContacts.AddLog(AText: STring);
-begin
-  REAddLog(AText);
-end;
-
-procedure TKRGoogleContacts.checkError(e: EIdHTTPProtocolException);
-begin
-
 end;
 
 constructor TKRGoogleContacts.Create(AOwner: TComponent);
 begin
   inherited;
-{$IFDEF GOOGLE_API_LOGS}
-  FIdLogs:=TIdLogEvent.Create(Self);
-  FIdLogs.OnReceived:=logRecv;
-  FIdLogs.OnSent:=logSend;
-  FIdLogs.OnStatus:=logStat;
-  FIdLogs.LogTime:=false;
-  FIdLogs.ReplaceCRLF:=false;
-  FIdLogs.Active:=true;
-{$ELSE}
-  FIdLogs:=nil;
-{$ENDIF}
+
   FContacts:=TList.Create;
-  FContactsTmp:=TList.Create;
   FGroups:=TList.Create;
   FGroupsTmp:=TList.Create;
+
+  FNeedScopes := [gscContacts];
 end;
 
 function TKRGoogleContacts.Delete(AIndex: integer): boolean;
-var s: String;
+var
+  data: TKRGoogleRESTRequestData;
 begin
   result:=true;
   if TGoogleContact(FContacts[AIndex]).FID<>'' then begin
-    FURL:='https://www.google.com/m8/feeds/contacts/default/full/'+
-      TGoogleContact(FContacts[AIndex]).FID+'?access_token='+FGoogleAuth.Token;
-    s:=TGoogleContact(FContacts[AIndex]).FETag;
-    result:=Integer(KRRunInThread(Pointer(PChar(s)),DeleteDo))<>0;
+    FParams.Clear;
+    FParams.Add( 'access_token', FGoogleAuth.Token );
+    data.url := 'https://www.google.com/m8/feeds/contacts/default/full/'+
+      TGoogleContact(FContacts[AIndex]).FID + getParams;
+    data.res := TGoogleContact(FContacts[AIndex]).FETag;
+    KRRunInThread( @data, DeleteDo );
+    Result := data.isOk;
   end;
   TGoogleContact(FContacts[AIndex]).Free;
   FContacts.Delete(AIndex);
@@ -550,20 +529,15 @@ end;
 
 function TKRGoogleContacts.DeleteDo(AThread: TThread; AData: Pointer): Pointer;
 var
-  http: TIdHTTP;
+  http: TKRIdHTTP;
+  data: PKRGoogleRESTRequestData;
 begin
-  http:=getHTTP;
-  Http.Request.CustomHeaders.Values['If-Match']:=String(PChar(AData));
-
-  Result:=Pointer(1);
-  try
-    Http.Delete(FURL);
-  except
-    Result:=Pointer(0);
-  end;
-
-  Http.IOHandler.Free;
-  Http.Free;
+  Result := nil;
+  data := AData;
+  http:=HTTPCreate;
+  Http.Request.CustomHeaders.Values['If-Match']:=data.res;
+  DEL( Http, data );
+  HTTPDestroy( Http );
 end;
 
 function TKRGoogleContacts.Delete(AContact: TGoogleContact): boolean;
@@ -584,11 +558,9 @@ var
 begin
   for I := 0 to FContacts.Count-1 do TGoogleContact(FContacts[i]).Free;
   FContacts.Free;
-  FContactsTmp.Free;
   for I := 0 to FGroups.Count-1 do TKRGoogleContactsGroup(FGroups[i]).Free;
   FGroups.Free;
   FGroupsTmp.Free;
-  if Assigned(FIdLogs) then FIdLogs.Free;
   inherited;
 end;
 
@@ -610,39 +582,6 @@ end;
 function TKRGoogleContacts.GetGroupCount: integer;
 begin
   Result:=FGroups.Count;
-end;
-
-function TKRGoogleContacts.getHTTP: TIdHTTP;
-var
-  http: TIdHTTP;
-  FSSL: TIdSSLIOHandlerSocketOpenSSL;
-begin
-  Http:=TIdHTTP.Create(nil);
-
-  FSSL:=TIdSSLIOHandlerSocketOpenSSL.Create(Http);
-  FSSL.SSLOptions.Mode :=  sslmUnassigned;
-  FSSL.SSLOptions.VerifyMode := [];
-  FSSL.SSLOptions.VerifyDepth := 2;
-
-  Http.Intercept:=FIdLogs;
-  Http.HandleRedirects:=true;
-  Http.IOHandler:=FSSL;
-  Http.AllowCookies:=false;
-{$IFNDEF GOOGLE_API_LOGS}
-  Http.Compressor:=TIdCompressorZLib.Create(Http);
-{$ENDIF}
-
-  Http.Request.UserAgent:='KRKRGoogleContacts ver. 1.0';
-  Http.Request.Accept:='application/atom+xml';
-  Http.Request.AcceptCharSet:='utf-8';
-  Http.Request.CharSet:='utf-8';
-  Http.Request.ContentType:='application/atom+xml';
-  Http.Request.CustomHeaders.Values['GData-Version']:='3.0';
-
-  Http.ConnectTimeout:=10000;
-  Http.ReadTimeout:=0;
-
-  result:=http;
 end;
 
 function TKRGoogleContacts.GroupAdd(ATitle: String): TKRGoogleContactsGroup;
@@ -706,14 +645,18 @@ begin
 end;
 
 function TKRGoogleContacts.GroupDelete(AIndex: integer): boolean;
-var s: String;
+var
+  data: TKRGoogleRESTRequestData;
 begin
   result:=true;
   if TKRGoogleContactsGroup(FGroups[AIndex]).FID<>'' then begin
-    FURL:='https://www.google.com/m8/feeds/groups/default/full/'+
-      TKRGoogleContactsGroup(FGroups[AIndex]).FID+'?access_token='+FGoogleAuth.Token;
-    s:=TKRGoogleContactsGroup(FGroups[AIndex]).FETag;
-    result:=Integer(KRRunInThread(Pointer(PChar(s)),GroupDeleteDo))<>0;
+    FParams.Clear;
+    FParams.Add( 'access_token', FGoogleAuth.Token);
+    data.url := 'https://www.google.com/m8/feeds/groups/default/full/' +
+      TKRGoogleContactsGroup(FGroups[AIndex]).FID + getParams;
+    data.res := TKRGoogleContactsGroup(FGroups[AIndex]).FETag;
+    KRRunInThread( @data, GroupDeleteDo );
+    Result := data.isOk;
   end;
   TKRGoogleContactsGroup(FGroups[AIndex]).Free;
   FGroups.Delete(AIndex);
@@ -722,49 +665,22 @@ end;
 function TKRGoogleContacts.GroupDeleteDo(AThread: TThread;
   AData: Pointer): Pointer;
 var
-  http: TIdHTTP;
+  http: TKRIdHTTP;
+  data: PKRGoogleRESTRequestData;
 begin
-  http:=getHTTP;
-  Http.Request.CustomHeaders.Values['If-Match']:=String(PChar(AData));
-
-  Result:=Pointer(1);
-  try
-    Http.Delete(FURL);
-  except
-    Result:=Pointer(0);
-  end;
-
-  Http.IOHandler.Free;
-  Http.Free;
+  Result := nil;
+  data := AData;
+  http:=HTTPCreate;
+  Http.Request.CustomHeaders.Values['If-Match']:=data.res;
+  DEL( Http, data );
+  HTTPDestroy( Http );
 end;
 
-procedure TKRGoogleContacts.logRecv(ASender: TComponent; const AText,
-  AData: string);
+function TKRGoogleContacts.HTTPCreate: TKRIdHTTP;
 begin
-  AddLog('HTTP_RECV');
-  if AText<>'' then AddLog(AText);
-  if AData<>'' then AddLog(AData);
-end;
-
-procedure TKRGoogleContacts.logSend(ASender: TComponent; const AText,
-  AData: string);
-begin
-  AddLog('HTTP_SEND');
-  if AText<>'' then AddLog(AText);
-  if AData<>'' then AddLog(AData);
-end;
-
-procedure TKRGoogleContacts.logStat(ASender: TComponent; const AText: string);
-begin
-  AddLog('HTTP_STAT: '+AText);
-end;
-
-procedure TKRGoogleContacts.Notification(AComponent: TComponent;
-  Operation: TOperation);
-begin
-  inherited;
-  if(Operation = opRemove)then
-    if (AComponent = FGoogleAuth)then FGoogleAuth:= nil;
+  Result := inherited HTTPCreate;
+  Result.Request.Accept:='application/atom+xml';
+  Result.Request.CustomHeaders.Values['GData-Version']:='3.0';
 end;
 
 procedure TKRGoogleContacts.parseGroupData(entry: IXMLNode;
@@ -777,7 +693,8 @@ begin
   if entry.HasAttribute('gd:etag') then
     grp.FETag:=entry.Attributes['gd:etag'];
   grp.FID_:=entry.ChildNodes['id'].Text;
-  sl:=Funcs.Explode('/',grp.FID_);
+  sl:=TStringList.Create;
+  KRSplitStr(grp.FID_,'/',sl);
   grp.FID:=sl[sl.Count-1];
   grp.FUpdated:=gcDateToDateTime(entry.ChildNodes['updated'].Text);
   grp.FSystemGroup:=false;
@@ -808,6 +725,8 @@ var
   FPobox: String;
   FRegion: String;
 begin
+  for I := 0 to cntct.FWebSiteList.Count-1 do TGoogleContactWebSite(cntct.FWebSiteList[i]).Free;
+  cntct.FWebSiteList.Clear;
   for I := 0 to cntct.FEmailList.Count-1 do TGoogleContactEMail(cntct.FEmailList[i]).Free;
   cntct.FEmailList.Clear;
   for I := 0 to cntct.FPhoneList.Count-1 do TGoogleContactPhone(cntct.FPhoneList[i]).Free;
@@ -819,7 +738,8 @@ begin
   cntct.fxml:=entry.XML;
   cntct.FETag:=entry.Attributes['gd:etag'];
   cntct.FID_:=entry.ChildNodes['id'].Text;
-  sl:=Funcs.Explode('/',cntct.FID_);
+  sl:=TSTringList.Create;
+  KRSplitStr(cntct.FID_,'/',sl);
   cntct.FID:=sl[sl.Count-1];
   cntct.FDeleted:=false;
   sl.Free;
@@ -841,9 +761,14 @@ begin
     end else if SameText(entry.ChildNodes[j].NodeName,'gd:deleted') then begin
       cntct.FDeleted:=true
     end else if SameText(entry.ChildNodes[j].NodeName,'gContact:groupMembershipInfo') then begin
-      sl:=Funcs.Explode('/',entry.ChildNodes[j].Attributes['href']);
-      cntct.FGroupID:=sl[sl.Count-1];
+      sl:=TStringList.Create;
+      KRSplitStr(entry.ChildNodes[j].Attributes['href'],'/',sl);
+      cntct.FGroups.Add( sl[sl.Count-1] );
       sl.Free;
+    end else if SameText(entry.ChildNodes[j].NodeName,'gContact:website') then begin
+      s:='';
+      if entry.ChildNodes[j].HasAttribute('label') then s:=entry.ChildNodes[j].Attributes['label'];
+      cntct.WebSiteAdd( entry.ChildNodes[j].Attributes['href'], s);
     end else if SameText(entry.ChildNodes[j].NodeName,'link') then begin
       s:=entry.ChildNodes[j].Attributes['rel'];
       if SameText(s,'http://schemas.google.com/contacts/2008/rel#photo') then begin
@@ -930,150 +855,240 @@ begin
   end;
 end;
 
-function TKRGoogleContacts.RetrievingAll: integer;
+function TKRGoogleContacts.RetrievingAll: boolean;
 var
-  i: integer;
-begin
-  Result:=0;
-  for I := 0 to FContacts.Count-1 do TGoogleContact(FContacts[i]).Free;
-  FContacts.Clear;
-  if FGoogleAuth=nil then exit;
-  if FGoogleAuth.Token='' then FGoogleAuth.Login;
-  if FGoogleAuth.Token='' then exit;
-  FURL:='https://www.google.com/m8/feeds/contacts/default/full?';
-  if FRetrievingDeleted then FURL:=FURL+'showdeleted=true&';
-  FURL:=FURL+'access_token='+FGoogleAuth.Token;
-
-  KRRunInThread(nil,RetrievingAllDo);
-  for I := 0 to FContactsTmp.Count-1 do FContacts.Add(FContactsTmp[i]);
-  Result:=FContacts.Count;
-end;
-
-function TKRGoogleContacts.RetrievingAllDo(AThread: TThread;
-  AData: Pointer): Pointer;
-var
-  http: TIdHTTP;
-  Response: TStringStream;
+  i,n1{,n2,k}: integer;
+  data: TKRGoogleRESTRequestData;
   xml: TXMLDocument;
-  RootNode: IXMLNode;
-  i, cnt, totalResults, itemsPerPage: integer;
+  RootNode, entry: IXMLNode;
+  cntct: TGoogleContact;
+begin
+  Result:=false;
+  if FGoogleAuth.Token='' then exit;
 
-  procedure prs;
-  var
-    i: integer;
-    entry: IXMLNode;
-    cntct: TGoogleContact;
-  begin
-    for i := 0 to RootNode.ChildNodes.Count - 1 do begin
-      if SameText(RootNode.ChildNodes[i].NodeName,'entry') then begin
+  if FRetrievingDeleted then FParams.Add( 'showdeleted', 'true');
+  FParams.Add( 'access_token', FGoogleAuth.Token);
+  data.url := 'https://www.google.com/m8/feeds/contacts/default/full' + getParams;
+
+  data.res := GoogleAuth.UserEmail;
+  data.res := copy( data.res, 1, Pos( '@', data.res ) - 1 );
+  data.res := FDataFolder + data.res + '.xml';
+
+  KRRunInThread( @data, RetrievingAllDo );
+  Result := data.isOk;
+
+  if Result then begin
+    //n2:=FContacts.Count-1;
+    //for j := 0 to n2 do TGoogleContact(FContacts[j]).FChecked := false;
+    FContacts.Clear;
+    CoInitialize(nil);
+    xml:=TXMLDocument.Create( Self );
+    try
+      xml.LoadFromFile( data.res );
+      xml.Active:=true;
+      RootNode:=xml.DocumentElement;
+      n1:=RootNode.ChildNodes.Count - 1;
+      for i := 0 to n1 do begin
+        if RootNode.ChildNodes[i].NodeName <> 'entry' then continue;
         entry:=RootNode.ChildNodes[i];
-        if SameText(entry.ChildNodes['category'].Attributes['term'],
-          'http://schemas.google.com/contact/2008#contact') then begin
+        if entry.ChildNodes['category'].Attributes['term'] <> 'http://schemas.google.com/contact/2008#contact' then continue;
+
+        {k:=-1;
+        n2:=FContacts.Count-1;
+        for j := 0 to n2 do begin
+          cntct:=TGoogleContact(FContacts[j]);
+          if cntct.FID_ <> entry.ChildNodes['id'].Text then continue;
+          cntct.FChecked := true;
+          break;
+        end;
+
+        if k>-1 then begin
+          if(not cntct.FModified) and (cntct.FETag = entry.Attributes['gd:etag'])then continue;
+        end else begin }
           cntct:=TGoogleContact.Create;
           cntct.contacts:=Self;
-          parseUserData(entry,cntct);
-
-          cntct.FModified:=false;
-          FContactsTmp.Add(cntct);
+          FContacts.Add(cntct);
+          {cntct.FChecked := true;
+        end;}
+        parseUserData(entry,cntct);
+        cntct.FModified:=false;
+      end;
+      {n2:=FContacts.Count-1;
+      j:=0;
+      while j < FContacts.Count do begin
+        cntct:=TGoogleContact(FContacts[j]);
+        if cntct.FChecked then begin
+          inc( j );
+          continue;
         end;
-      end;
-    end;
-  end;
-
-begin
-  FContactsTmp.Clear;
-
-  http:=getHTTP;
-
-  Response:=TStringStream.Create;
-  try
-    Http.Get(FURL,Response);
-  except end;
-
-  if Response.Size>0 then begin
-    CoInitialize(nil);
-    xml:=TXMLDocument.Create(Self);
-    try
-      cnt:=0;
-      Response.Position:=0;
-//Response.SaveToFile('d:\'+self.FGoogleAuth.Name+'_'+IntToStr(cnt)+'.xml');
-      xml.LoadFromStream(Response);
-      xml.Active := true;
-
-
-      RootNode := xml.DocumentElement;
-      totalResults:=0;
-      itemsPerPage:=0;
-
-      for i := 0 to RootNode.ChildNodes.Count - 1 do begin
-        if SameText(RootNode.ChildNodes[i].NodeName,'openSearch:totalResults') then
-          totalResults:=StrToIntDef(RootNode.ChildNodes[i].Text,0)
-        else if SameText(RootNode.ChildNodes[i].NodeName,'openSearch:itemsPerPage') then
-          itemsPerPage:=StrToIntDef(RootNode.ChildNodes[i].Text,0)
-        else if SameText(RootNode.ChildNodes[i].NodeName,'id') then
-          if FEMailID='' then FEMailID:=String(HTTPEncode(AnsiString(RootNode.ChildNodes[i].Text)));
-      end;
-
-      prs;
-      cnt:=cnt+itemsPerPage;
-      while cnt<totalResults do begin
-        Response.Clear;
-        try
-          Http.Get(FURL+'&start-index='+IntToStr(cnt+1),Response);
-        except end;
-        if Response.Size=0 then break;
-        xml.Active:=false;
-        Response.Position:=0;
-//Response.SaveToFile('d:\'+self.FGoogleAuth.Name+'_'+IntToStr(cnt)+'.xml');
-        xml.LoadFromStream(Response);
-        xml.Active := true;
-        RootNode := xml.DocumentElement;
-        for i := 0 to RootNode.ChildNodes.Count - 1 do
-          if SameText(RootNode.ChildNodes[i].NodeName,'openSearch:itemsPerPage') then
-            itemsPerPage:=StrToIntDef(RootNode.ChildNodes[i].Text,0);
-
-        prs;
-        cnt:=cnt+itemsPerPage;
-
-      end;
+        FContacts.Remove( cntct );
+      end;}
 
     finally
       xml.Free;
       CoUninitialize;
     end;
   end;
-  response.Free;
-  Http.IOHandler.Free;
-  Http.Free;
-  Result:=nil;
 end;
 
-function TKRGoogleContacts.RetrievingGroups: integer;
+function TKRGoogleContacts.RetrievingAllDo(AThread: TThread;
+  AData: Pointer): Pointer;
+var
+  http: TKRIdHTTP;
+  data: PKRGoogleRESTRequestData;
+  Response: TStringStream;
+  xml, xmlFull: TXMLDocument;
+  RootNode, fr: IXMLNode;
+  cnt, totalResults, itemsPerPage: integer;
+  url: String;
+  //updt: TDateTime;
+
+  procedure prs2;
+  var
+    i, n1{, n2, j, k}: integer;
+    entry, fe: IXMLNode;
+    cntct: TGoogleContact;
+    //dt: TDateTime;
+    nn: String;
+  begin
+    n1 := RootNode.ChildNodes.Count - 1;
+    for i := 0 to n1 do begin
+      nn:=RootNode.ChildNodes[i].NodeName;
+      if nn = 'openSearch:totalResults' then begin
+        totalResults:=StrToIntDef( RootNode.ChildNodes[i].Text, 0);
+        continue;
+      end;
+      if nn = 'openSearch:itemsPerPage' then begin
+        itemsPerPage:=StrToIntDef( RootNode.ChildNodes[i].Text, 0);
+        continue;
+      end;
+      if nn <> 'entry' then continue;
+      entry:=RootNode.ChildNodes[i];
+      if entry.ChildNodes['category'].Attributes['term'] <> 'http://schemas.google.com/contact/2008#contact' then continue;
+      inc( cnt );
+      {n2 := fr.ChildNodes.Count - 1;
+      k:=-1;
+      for j := 0 to n2 do begin
+        if fr.ChildNodes[j].NodeName <> 'entry' then continue;
+        fe:=fr.ChildNodes[j];
+        if fe.ChildNodes['category'].Attributes['term'] <> 'http://schemas.google.com/contact/2008#contact' then continue;
+        if fe.ChildNodes['id'].Text <> entry.ChildNodes['id'].Text then continue;
+        k := j;
+        break;
+      end;}
+      //dt := gcDateToDateTime( entry.ChildNodes['updated'].Text );
+      {if k > -1 then begin
+        if fe.Attributes['gd:etag'] = entry.Attributes['gd:etag'] then continue;
+        fr.ChildNodes.Remove( fe );
+        fr.ChildNodes.Insert( k, entry );
+      end else }fr.ChildNodes.Add( entry );
+      //if dt > updt then updt := dt;
+    end;
+  end;
+
+begin
+  Result := nil;
+  CoInitialize(nil);
+  data := AData;
+  http := HTTPCreate;
+
+  xmlFull := TXMLDocument.Create( Self );
+  try
+
+    if FileExists( data.res ) then begin
+      DeleteFile( data.res );
+      //xmlFull.LoadFromFile( data.res );
+      xmlFull.Active:=true;
+      //FEMailID := KRHTTPEncode( xmlFull.DocumentElement.ChildNodes['id'].Text );
+      //data.url := data.url + '&updated-min=' + xmlFull.DocumentElement.ChildNodes['updated'].Text;
+    end else xmlFull.Active:=true;
+
+    Response := GET( http, data );
+
+    if data.isOk then begin
+      xml:=TXMLDocument.Create( Self );
+      try
+        Response.Position:=0;
+        //updt := 0;
+        xml.LoadFromStream(Response);
+        xml.Active := true;
+        RootNode := xml.DocumentElement;
+        //if xmlFull.DocumentElement = nil then begin
+          xmlFull.Version := xml.Version;
+          xmlFull.Encoding := xml.Encoding;
+          xmlFull.DocumentElement := xmlFull.CreateNode('feed', ntElement, RootNode.NamespaceURI );
+          FEMailID := RootNode.ChildNodes['id'].Text;
+          xmlFull.DocumentElement.AddChild('id').Text := FEMailID;
+          FEMailID := KRHTTPEncode( FEMailID );
+          //xmlFull.DocumentElement.AddChild('updated').Text := '';
+        //end;
+        fr := xmlFull.DocumentElement;
+
+        totalResults:=0;
+        itemsPerPage:=0;
+        cnt := 0;
+        prs2;
+
+        url := data.url;
+        while cnt<totalResults do begin
+          data.url := url + '&start-index=' + IntToStr( cnt + 1 );
+          FreeAndNil( Response );
+          Response := GET( Http, data );
+          if Response.Size=0 then break;
+          xml.Active:=false;
+          Response.Position:=0;
+          xml.LoadFromStream(Response);
+          xml.Active := true;
+          RootNode := xml.DocumentElement;
+
+          prs2;
+        end;
+
+        //if updt > 0 then begin
+          //fr.ChildNodes['updated'].Text := DateTimeTOgcDate( updt );
+          xmlFull.SaveToFile( data.res );
+        //end;
+      finally
+        xml.Free;
+      end;
+    end;
+
+  except end;
+  xmlFull.Free;
+  HTTPDestroy( Http );
+  Response.Free;
+  CoUninitialize;
+end;
+
+function TKRGoogleContacts.RetrievingGroups: boolean;
 var
   i: integer;
+  data: TKRGoogleRESTRequestData;
 begin
-  Result:=0;
+  Result:=false;
   for I := 0 to FGroups.Count-1 do TKRGoogleContactsGroup(FGroups[i]).Free;
   FGroups.Clear;
-  if FGoogleAuth=nil then exit;
-  if FGoogleAuth.Token='' then FGoogleAuth.Login;
-  if FGoogleAuth.Token='' then exit;
-  FURL:='https://www.google.com/m8/feeds/groups/default/full?access_token='+
-    FGoogleAuth.Token;
 
-  KRRunInThread(nil,RetrievingGroupsDo);
-  for I := 0 to FGroupsTmp.Count-1 do FGroups.Add(FGroupsTmp[i]);
-  Result:=FGroups.Count;
+  FParams.Clear;
+  FParams.Add( 'access_token', FGoogleAuth.Token);
+  data.url := 'https://www.google.com/m8/feeds/groups/default/full' + getParams;
+  KRRunInThread( @data, RetrievingGroupsDo );
+  if data.isOk then begin
+    for I := 0 to FGroupsTmp.Count-1 do FGroups.Add(FGroupsTmp[i]);
+    Result := true;
+  end;
 end;
 
 function TKRGoogleContacts.RetrievingGroupsDo(AThread: TThread;
   AData: Pointer): Pointer;
 var
-  http: TIdHTTP;
+  http: TKRIdHTTP;
+  data: PKRGoogleRESTRequestData;
   Response: TStringStream;
   xml: TXMLDocument;
   RootNode: IXMLNode;
   i, cnt, totalResults, itemsPerPage: integer;
+  url: String;
 
   procedure prs;
   var
@@ -1098,27 +1113,20 @@ var
   end;
 
 begin
-  Result:=nil;
+  Result := nil;
+  data := AData;
+  http := HTTPCreate;
+  Response := GET( http, data );
 
-  FGroupsTmp.Clear;
-
-  http:=getHTTP;
-
-  Response:=TStringStream.Create;
-  try
-    Http.Get(FURL,Response);
-  except end;
-
-  if Response.Size>0 then begin
+  if data.isOk then begin
     CoInitialize(nil);
+    FGroupsTmp.Clear;
     xml:=TXMLDocument.Create(Self);
     try
       cnt:=0;
       Response.Position:=0;
-//Response.SaveToFile('d:\'+self.FGoogleAuth.Name+'_groups_'+IntToStr(cnt)+'.xml');
       xml.LoadFromStream(Response);
       xml.Active := true;
-
 
       RootNode := xml.DocumentElement;
       totalResults:=0;
@@ -1130,20 +1138,19 @@ begin
         else if SameText(RootNode.ChildNodes[i].NodeName,'openSearch:itemsPerPage') then
           itemsPerPage:=StrToIntDef(RootNode.ChildNodes[i].Text,0)
         else if SameText(RootNode.ChildNodes[i].NodeName,'id') then
-          if FEMailID='' then FEMailID:=String(HTTPEncode(AnsiString(RootNode.ChildNodes[i].Text)));
+          if FEMailID='' then FEMailID:=KRHTTPEncode( RootNode.ChildNodes[i].Text );
       end;
 
       prs;
       cnt:=cnt+itemsPerPage;
+      url := data.url;
       while cnt<totalResults do begin
-        Response.Clear;
-        try
-          Http.Get(FURL+'&start-index='+IntToStr(cnt+1),Response);
-        except end;
+        data.url := url + '&start-index=' + IntToStr( cnt + 1 );
+        FreeAndNil( Response );
+        Response := GET( http, data );
         if Response.Size=0 then break;
         xml.Active:=false;
         Response.Position:=0;
-//Response.SaveToFile('d:\'+self.FGoogleAuth.Name+'_groups_'+IntToStr(cnt)+'.xml');
         xml.LoadFromStream(Response);
         xml.Active := true;
         RootNode := xml.DocumentElement;
@@ -1153,7 +1160,6 @@ begin
 
         prs;
         cnt:=cnt+itemsPerPage;
-
       end;
 
     finally
@@ -1164,6 +1170,13 @@ begin
   response.Free;
   Http.IOHandler.Free;
   Http.Free;
+end;
+
+procedure TKRGoogleContacts.SetDataFolder(const Value: TFileName);
+begin
+  if (csDesigning in ComponentState) then
+    FDataFolder:=ExtractFilePath(Value)
+  else FDataFolder:=Value;
 end;
 
 procedure TKRGoogleContacts.SetGoogleAuth(const Value: TKRGoogleAuth);
@@ -1187,8 +1200,8 @@ procedure TKRGoogleContacts.userDataToXml(AXML: String; cntct: TGoogleContact;
   AStream: TStream);
 var
   xml: TXMLDocument;
-  RootNode, tmp, title, nm, content, appEdited, grp: IXMLNode;
-  phns, mls, orgs, adrs: array of IXMLNode;
+  RootNode, tmp, title, nm, content, appEdited: IXMLNode;
+  phns, mls, orgs, adrs, grps, sites: array of IXMLNode;
   i: integer;
 begin
   CoInitialize(nil);
@@ -1201,7 +1214,6 @@ begin
     nm:=nil;
     appEdited:=nil;
     content:=nil;
-    grp:=nil;
     for i := 0 to RootNode.ChildNodes.Count - 1 do begin
       if SameText(RootNode.ChildNodes[i].NodeName,'title') then
         title:=RootNode.ChildNodes[i]
@@ -1211,9 +1223,13 @@ begin
         appEdited:=RootNode.ChildNodes[i]
       else if SameText(RootNode.ChildNodes[i].NodeName,'gd:name') then
         nm:=RootNode.ChildNodes[i]
-      else if SameText(RootNode.ChildNodes[i].NodeName,'gContact:groupMembershipInfo') then
-        grp:=RootNode.ChildNodes[i]
-      else if SameText(RootNode.ChildNodes[i].NodeName,'gd:email') then begin
+      else if SameText(RootNode.ChildNodes[i].NodeName,'gContact:groupMembershipInfo') then begin
+        SetLength(grps,Length(grps)+1);
+        grps[Length(grps)-1]:=RootNode.ChildNodes[i];
+      end else if SameText(RootNode.ChildNodes[i].NodeName,'gContact:website') then begin
+        SetLength(sites,Length(sites)+1);
+        sites[Length(sites)-1]:=RootNode.ChildNodes[i];
+      end else if SameText(RootNode.ChildNodes[i].NodeName,'gd:email') then begin
         SetLength(mls,Length(mls)+1);
         mls[Length(mls)-1]:=RootNode.ChildNodes[i];
       end else if SameText(RootNode.ChildNodes[i].NodeName,'gd:organization') then begin
@@ -1245,18 +1261,28 @@ begin
       end;
       content.Text:=cntct.FNotes;
     end else if content<>nil then RootNode.ChildNodes.Remove(content);
-    if cntct.FGroupID<>'' then begin
-      if grp=nil then
-        grp:=RootNode.AddChild('gContact:groupMembershipInfo');
-      grp.Attributes['deleted']:='false';
-      grp.Attributes['href']:='http://www.google.com/m8/feeds/groups/'+FEMailID+'/base/'+cntct.FGroupID;
-    end else if grp<>nil then RootNode.ChildNodes.Remove(grp);
+
+    for i := 0 to Length(grps)-1 do RootNode.ChildNodes.Remove(grps[i]);
+    for i := 0 to cntct.FGroups.Count-1 do begin
+      tmp:=RootNode.AddChild('gContact:groupMembershipInfo');
+      tmp.Attributes['xmlns:gContact']:='http://schemas.google.com/contact/2008';
+      tmp.Attributes['deleted']:='false';
+      tmp.Attributes['href']:='http://www.google.com/m8/feeds/groups/'+FEMailID+'/base/'+cntct.FGroups[i];
+    end;
+
+    for i := 0 to Length(sites)-1 do RootNode.ChildNodes.Remove(sites[i]);
+    for i := 0 to cntct.FWebSiteList.Count-1 do begin
+      tmp:=RootNode.AddChild('gContact:website');
+      tmp.Attributes['xmlns:gContact']:='http://schemas.google.com/contact/2008';
+      tmp.Attributes['href']:= TGoogleContactWebSite( cntct.FWebSiteList[i] ).FHref;
+      tmp.Attributes['label']:= TGoogleContactWebSite( cntct.FWebSiteList[i] ).FSiteLabel;
+    end;
+
     for I := 0 to Length(mls)-1 do RootNode.ChildNodes.Remove(mls[i]);
     for I := 0 to cntct.EmailCount-1 do begin
       tmp:=RootNode.AddChild('gd:email');
       if cntct.Emails[i].FLabel<>'' then tmp.Attributes['label']:=cntct.Emails[i].FLabel
       else
-      //if(cntct.Emails[i].FRel<>gmtOther)or((cntct.Emails[i].FRel=gmtOther)and(cntct.Emails[i].FLabel='')) then
         tmp.Attributes['rel']:=EmailTypeTOgcStr(cntct.Emails[i].FRel);
       tmp.Attributes['address']:=cntct.Emails[i].Address;
       if cntct.Emails[i].FDisplayName<>'' then tmp.Attributes['displayName']:=cntct.Emails[i].FDisplayName;
@@ -1299,7 +1325,7 @@ begin
         tmp.AddChild('gd:postcode').Text:=cntct.PostalAddress[i].FPostcode;
       if cntct.PostalAddress[i].FCountry.Code<>0 then begin
         nm:=tmp.AddChild('gd:country');
-        nm.Text:=cntct.PostalAddress[i].FCountry.ShortName;
+        //nm.Text:=cntct.PostalAddress[i].FCountry.Alpha2codeStr;
         nm.Attributes['code']:=cntct.PostalAddress[i].FCountry.Alpha2codeStr;
       end;
 
@@ -1351,13 +1377,14 @@ begin
   if fadditionalName<>'' then sl.Add(fadditionalName);
   if ffamilyName<>'' then sl.Add(ffamilyName);
   if fnameSuffix<>'' then sl.Add(fnameSuffix);
-  Result:=Funcs.Implode(' ',sl);
+  sl.Delimiter := ' ';
+  Result := sl.DelimitedText;
   sl.Free;
 end;
 
 procedure TGoogleContactName.SetAdditionalName(const Value: String);
 begin
-  if not SameText(trim(Value),FAdditionalName) then begin
+  if trim(Value)<>FAdditionalName then begin
     FAdditionalName := trim(Value);
     if Assigned(contact) then contact.FModified:=true;
   end;
@@ -1365,7 +1392,7 @@ end;
 
 procedure TGoogleContactName.SetFamilyName(const Value: String);
 begin
-  if not SameText(trim(Value),FFamilyName) then begin
+  if trim(Value)<>FFamilyName then begin
     FFamilyName := trim(Value);
     if Assigned(contact) then contact.FModified:=true;
   end;
@@ -1373,7 +1400,7 @@ end;
 
 procedure TGoogleContactName.SetGivenName(const Value: String);
 begin
-  if not SameText(trim(Value),FGivenName) then begin
+  if trim(Value)<>FGivenName then begin
     FGivenName := trim(Value);
     if Assigned(contact) then contact.FModified:=true;
   end;
@@ -1381,7 +1408,7 @@ end;
 
 procedure TGoogleContactName.SetNamePrefix(const Value: String);
 begin
-  if not SameText(trim(Value),FNamePrefix) then begin
+  if trim(Value)<>FNamePrefix then begin
     FNamePrefix := trim(Value);
     if Assigned(contact) then contact.FModified:=true;
   end;
@@ -1389,7 +1416,7 @@ end;
 
 procedure TGoogleContactName.SetNameSuffix(const Value: String);
 begin
-  if not SameText(trim(Value),FNameSuffix) then begin
+  if trim(Value)<>FNameSuffix then begin
     FNameSuffix := trim(Value);
     if Assigned(contact) then contact.FModified:=true;
   end;
@@ -1415,7 +1442,9 @@ begin
   FUpdated:=AContact.FUpdated;
   FModified:=AContact.FModified;
   FNotes:=AContact.Notes;
-  self.FGroupID:=AContact.FGroupID;
+
+  self.FGroups.Assign( AContact.FGroups );
+
   self.FDeleted:=AContact.FDeleted;
 
   for I := 0 to FEmailList.Count-1 do TGoogleContactEMail(FEmailList[i]).Free;
@@ -1459,6 +1488,7 @@ end;
 
 constructor TGoogleContact.Create;
 begin
+  FGroups:=TStringList.Create;
   FName:=TGoogleContactName.Create;
   FName.contact:=self;
   FPhoto:=TGoogleContactPhoto.Create;
@@ -1467,23 +1497,18 @@ begin
   FPhoneList:=TList.Create;
   FOrganizationList:=TList.Create;
   FPostalAddressList:=TList.Create;
+  FWebSiteList:=TList.Create;
 end;
 
 function TGoogleContact.CreateDo(AThread: TThread; AData: Pointer): Pointer;
 var
-  http: TIdHTTP;
-  Response: TStringStream;
+  http: TKRIdHTTP;
+  data: PKRGoogleRESTRequestData;
 begin
-  http:=contacts.getHTTP;
-
-  Response:=TStringStream.Create;
-  try
-    Http.Post(FURL,TStream(AData),Response);
-  except end;
-  Result:=Pointer(response);
-
-  Http.IOHandler.Free;
-  Http.Free;
+  data := AData;
+  http := contacts.HTTPCreate;
+  Result:=Pointer( contacts.Post( http, data, 'application/atom+xml' ) );
+  contacts.HTTPDestroy( Http );
 end;
 
 destructor TGoogleContact.Destroy;
@@ -1500,6 +1525,9 @@ begin
   FOrganizationList.Free;
   for I := 0 to FPostalAddressList.Count-1 do TGoogleContactPostalAddress(FPostalAddressList[i]).Free;
   FPostalAddressList.Free;
+  for I := 0 to FWebSiteList.Count-1 do TGoogleContactWebSite(FWebSiteList[i]).Free;
+  FWebSiteList.Free;
+  FGroups.Free;
   inherited;
 end;
 
@@ -1534,6 +1562,16 @@ begin
   Result:=FEmailList.Count;
 end;
 
+function TGoogleContact.GetGroups(Index: integer): String;
+begin
+  Result := FGroups[ Index ];
+end;
+
+function TGoogleContact.GetGroupsCount: integer;
+begin
+  Result := FGroups.Count;
+end;
+
 function TGoogleContact.GetOrganization(
   AIndex: Integer): TGoogleContactOrganization;
 begin
@@ -1564,6 +1602,40 @@ end;
 function TGoogleContact.GetPostalAddressCount: integer;
 begin
   Result:=FPostalAddressList.Count;
+end;
+
+function TGoogleContact.GetWebSite(AIndex: Integer): TGoogleContactWebSite;
+begin
+  result:=TGoogleContactWebSite(FWebSiteList[AIndex]);end;
+
+function TGoogleContact.GetWebSiteCount: integer;
+begin
+  Result:=FWebSiteList.Count;
+end;
+
+procedure TGoogleContact.GroupAdd(AGroup: TKRGoogleContactsGroup);
+var
+  I: Integer;
+begin
+  for I := 0 to FGroups.Count-1 do
+    if FGroups[i] = AGroup.id then exit;
+  FGroups.Add( AGroup.id );
+end;
+
+procedure TGoogleContact.GroupDel(AIndex: Integer);
+begin
+  FGroups.Delete( AIndex );
+  FModified:=true;
+end;
+
+function TGoogleContact.InGroup(AGroup: TKRGoogleContactsGroup): boolean;
+var
+  I: Integer;
+begin
+  Result:=true;
+  for I := 0 to FGroups.Count-1 do
+    if FGroups[i]=AGroup.id then exit;
+  Result:=false;
 end;
 
 function TGoogleContact.OrganizationAdd(AOrgName: String;
@@ -1630,15 +1702,17 @@ end;
 
 function TGoogleContact.Retrieve: boolean;
 var
-  s: String;
   Response: TStringStream;
   xml: TXMLDocument;
   RootNode: IXMLNode;
+  data: TKRGoogleRESTRequestData;
 begin
   result:=false;
-  s:='https://www.google.com/m8/feeds/contacts/default/full/'+FID+'?access_token='+contacts.FGoogleAuth.Token;
-  Response:=TStringStream(KRRunInThread(Pointer(PChar(s)),RetrieveDo));
-  if Response.Size>0 then begin
+  contacts.FParams.Clear;
+  contacts.FParams.Add( 'access_token', contacts.FGoogleAuth.Token);
+  data.url := 'https://www.google.com/m8/feeds/contacts/default/full/' + FID + contacts.getParams;
+  Response := TStringStream( KRRunInThread( @data, RetrieveDo ) );
+  if data.isOk then begin
     CoInitialize(nil);
     xml:=TXMLDocument.Create(contacts);
     try
@@ -1646,9 +1720,8 @@ begin
       xml.LoadFromStream(Response);
       xml.Active := true;
       RootNode := xml.DocumentElement;
-      if SameText(RootNode.NodeName,'entry') then begin
-        if SameText(RootNode.ChildNodes['category'].Attributes['term'],
-          'http://schemas.google.com/contact/2008#contact') then begin
+      if RootNode.NodeName = 'entry' then begin
+        if RootNode.ChildNodes['category'].Attributes['term'] = 'http://schemas.google.com/contact/2008#contact' then begin
           contacts.parseUserData(RootNode,self);
           result:=true;
           end;
@@ -1656,33 +1729,20 @@ begin
     finally
       xml.Free;
       CoUninitialize;
+      Response.Free;
     end;
   end;
 end;
 
 function TGoogleContact.RetrieveDo(AThread: TThread; AData: Pointer): Pointer;
 var
-  http: TIdHTTP;
-  Response: TStringStream;
+  http: TKRIdHTTP;
+  data: PKRGoogleRESTRequestData;
 begin
-  http:=contacts.getHTTP;
-
-  Response:=TStringStream.Create;
-  try
-    Http.Get(String(PChar(AData)),Response);
-  except end;
-  Result:=Pointer(Response);
-
-  Http.IOHandler.Free;
-  Http.Free;
-end;
-
-procedure TGoogleContact.SetGroupID(const Value: String);
-begin
-  if not SameText(trim(Value),FGroupID) then begin
-    FGroupID := trim(Value);
-    FModified:=true;
-  end;
+  data := AData;
+  http := contacts.HTTPCreate;
+  Result:=Pointer( contacts.GET( http, data ) );
+  contacts.HTTPDestroy( Http );
 end;
 
 procedure TGoogleContact.SetNotes(const Value: String);
@@ -1697,26 +1757,27 @@ function TGoogleContact.Update: boolean;
 var
   xml: TXMLDocument;
   RootNode: IXMLNode;
-  stream: TMemoryStream;
   Response: TStringStream;
-
+  Data: TKRGoogleRESTRequestData;
 begin
-  Result:=false;
-  stream:=TMemoryStream.Create;
+  Result := false;
+  data.sData := TMemoryStream.Create;
+  contacts.FParams.Create;
+  contacts.FParams.Add( 'access_token', contacts.FGoogleAuth.Token);
   if FID<>'' then begin
-    contacts.userDataToXml('<?xml version="1.0" encoding="UTF-8"?>'#$A+fxml,self,stream);
-    FURL:='https://www.google.com/m8/feeds/contacts/default/full/'+FID+'?access_token='+contacts.FGoogleAuth.Token;
-    Response:=TStringStream(KRRunInThread(stream,UpdateDo));
+    contacts.userDataToXml( '<?xml version="1.0" encoding="UTF-8"?>'#$A + fxml, self, data.sData );
+    data.url := 'https://www.google.com/m8/feeds/contacts/default/full/' + FID + contacts.getParams;
+    Response := TStringStream( KRRunInThread( @data, UpdateDo ) );
   end else begin
     contacts.userDataToXml('<?xml version="1.0" encoding="UTF-8"?>'#$A+
       '<entry xmlns="http://www.w3.org/2005/Atom" xmlns:gd="http://schemas.google.com/g/2005" xmlns:gContact="http://schemas.google.com/contact/2008">'#$A+
       ' <category scheme="http://schemas.google.com/g/2005#kind" term="http://schemas.google.com/contact/2008#contact"/>'#$A+
       '</entry>'#$A
-    ,self,stream);
-    FURL:='https://www.google.com/m8/feeds/contacts/default/full/'+FID+'?access_token='+contacts.FGoogleAuth.Token;
-    Response:=TStringStream(KRRunInThread(stream,CreateDo));
+    ,self,data.sData);
+    data.url := 'https://www.google.com/m8/feeds/contacts/default/full/' + FID + contacts.getParams;
+    Response := TStringStream( KRRunInThread( @data, CreateDo ) );
   end;
-  if Response.Size>10 then begin
+  if data.isOk then begin
     CoInitialize(nil);
     xml:=TXMLDocument.Create(contacts);
     try
@@ -1735,30 +1796,40 @@ begin
     finally
       xml.Free;
       CoUninitialize;
+      Response.Free;
     end;
   end;
-  stream.Free;
-  Response.Free;
+  data.sData.Free;
 end;
 
 function TGoogleContact.UpdateDo(AThread: TThread; AData: Pointer): Pointer;
 var
-  http: TIdHTTP;
-  Response: TStringStream;
+  http: TKRIdHTTP;
+  data: PKRGoogleRESTRequestData;
 begin
-  http:=contacts.getHTTP;
-  Http.Request.CustomHeaders.Values['If-Match']:=Self.FETag;
+  data := AData;
+  http := contacts.HTTPCreate;
+  Http.Request.CustomHeaders.Values['If-Match']:=FETag;
+  Result:=Pointer( contacts.PUT( http, data, 'application/atom+xml' ) );
+  contacts.HTTPDestroy( Http );
+end;
 
-  Response:=TStringStream.Create;
-  try
-    Http.Put(FURL,TStream(AData),Response);
-  except on e: EIdHTTPProtocolException do
-    contacts.checkError(e);
-  end;
+function TGoogleContact.WebSiteAdd(AHref,
+  ALabel: String): TGoogleContactWebSite;
+begin
+  Result:=TGoogleContactWebSite.Create;
+  Result.contact:=self;
+  Result.FHref:=AHref;
+  Result.FSiteLabel:=ALabel;
+  FWebSiteList.Add(Result);
+  FModified:=true;
+end;
 
-  Result:=Pointer(response);
-  Http.IOHandler.Free;
-  Http.Free;
+procedure TGoogleContact.WebSiteDelete(AIndex: integer);
+begin
+  TGoogleContactWebSite(FWebSiteList[AIndex]).Free;
+  FWebSiteList.Delete(AIndex);
+  FModified:=true;
 end;
 
 { TGoogleContactPhoto }
@@ -1772,140 +1843,148 @@ end;
 function TGoogleContactPhoto.DeleteDo(AThread: TThread;
   AData: Pointer): Pointer;
 var
-  http: TIdHTTP;
+  http: TKRIdHTTP;
+  data: PKRGoogleRESTRequestData;
 begin
-  http:=contact.contacts.getHTTP;
-  Http.Request.CustomHeaders.Values['If-Match']:=String(PChar(AData));
-
-  Result:=Pointer(1);
-  try
-    Http.Delete(FURL);
-  except
-    Result:=Pointer(0);
-  end;
-
-  Http.IOHandler.Free;
-  Http.Free;
-end;
-
-destructor TGoogleContactPhoto.destroy;
-begin
-  if Assigned(bmp) then bmp.Free;
-  inherited;
+  Result := nil;
+  data := AData;
+  http := contact.contacts.HTTPCreate;
+  Http.Request.CustomHeaders.Values['If-Match'] := data.res;
+  contact.contacts.DEL( http, data );
+  contact.contacts.HTTPDestroy( Http );
 end;
 
 function TGoogleContactPhoto.getBitmap: TBitmap;
+var
+  ini: TIniFile;
+  ms, s, s0: String;
+  n, i: integer;
+  png: TPngImage;
+
+  function mkPath(APath: String): String;
+  begin
+    if not DirectoryExists(APath) then mkDir(APath);
+    Result:=APath+'\';
+  end;
+
 begin
-  if Assigned(bmp) then bmp.Free;
-  bmp:=nil;
   result:=nil;
   if(not Assigned(contact.contacts))then exit;
   if(not Assigned(contact.contacts.FGoogleAuth))then exit;
-  if FEtag<>'' then bmp:=contact.contacts.FGoogleAuth.GetUserIcon(Fhref,FEtag,true);
-  Result:=bmp;
+  if FEtag<>'' then begin
+    ini:=TIniFile.Create( contact.contacts.FDataFolder + 'contacts.ini' );
+    try
+      ms := FHref + '!' + FETag;
+      n := ini.ReadInteger('Photos', 'Count', 0) - 1;
+      for I := 0 to n do begin
+        s := IntToStr( i );
+        if ini.ReadString('Photos', 'Photo' + s, '') = ms then begin
+          png:=TPngImage.Create;
+          Result:=TBitmap.Create;
+          try
+            png.LoadFromFile( ini.ReadString('Photos', 'PhotoPath' + s, '') );
+            Result.Assign(png);
+          except
+            FreeAndNil( Result );
+          end;
+          png.Free;
+          exit;
+        end;
+      end;
+
+      s:=FHref;
+      Result := TBitmap( KRRunInThread( Pointer(PChar(s)), thLoadIcon) );
+      if Result<>nil then begin
+        inc(n);
+        randomize;
+        s:=contact.contacts.FDataFolder;
+
+        i:=100000000 + Random(899999999);
+        while fileExists( s + IntToStr( i div 10000000 ) + '\' + IntToStr( i div 10000 ) + '\' + IntToStr( i ) + '.png' ) do  i:=Random(99999999);
+        s := mkPath( mkPath( s + IntToStr( i div 10000000 ) ) + IntToStr( i div 10000 ) ) + IntToStr( i ) + '.png';
+        png := TPngImage.Create;
+        png.Assign( Result );
+        png.SaveToFile( s );
+        png.Free;
+        s0 := IntToStr( n );
+        ini.WriteString( 'Photos', 'Photo' + s0, ms );
+        ini.WriteString( 'Photos', 'PhotoPath' + s0, s );
+        ini.WriteInteger( 'Photos', 'Count', n + 1 );
+      end;
+
+    finally
+      ini.Free;
+    end;
+
+  end;
 end;
 
 function TGoogleContactPhoto.getEtagDo(AThread: TThread;
   AData: Pointer): Pointer;
 var
-  http: TIdHTTP;
-  response: TMemoryStream;
+  http: TKRIdHTTP;
+  data: PKRGoogleRESTRequestData;
 begin
-  http:=contact.contacts.getHTTP;
-
-  response:=TMemoryStream(AData);
-  try
-    Http.Get(FURL,response);
-  except end;
-
-  _etag:=Http.Response.ETag;
-
-  result:=Pointer(response);
-
-  Http.Free;
+  data := AData;
+  http := contact.contacts.HTTPCreate;
+  Result := Pointer( contact.contacts.GET( http, data ) );
+  if data.isOk then
+    data.res := Http.Response.ETag;
+  contact.contacts.HTTPDestroy( Http );
 end;
 
 function TGoogleContactPhoto.LoadDo(AThread: TThread; AData: Pointer): Pointer;
-type
-  TBSTData = record
-    ETag: Pointer;
-    stream: TStream;
-  end;
-
 var
-  http: TIdHTTP;
-  fstream,strm: TmemoryStream;
+  http: TKRIdHTTP;
+  data: PKRGoogleRESTRequestData;
 begin
-  fstream:=TmemoryStream(TBSTData(AData^).stream);
-  strm:=TmemoryStream.Create;
-
-  http:=contact.contacts.getHTTP;
-  Http.Request.ContentType:='image/*';
-  if TBSTData(AData^).ETag<>nil then
-    Http.Request.CustomHeaders.Values['If-Match']:=String(PChar(TBSTData(AData^).ETag));
-
-  Result:=Pointer(1);
-  try
-    Http.Put(FURL,fstream,strm);
-  except
-    Result:=Pointer(0);
-  end;
-
-  if integer(Result)=1 then begin
-    fstream.Clear;
-    fstream.LoadFromStream(strm);
-  end;
-
-  strm.Free;
-  Http.Free;
+  Result := nil;
+  data := AData;
+  http:=contact.contacts.HTTPCreate;
+  Http.Request.CustomHeaders.Values['If-Match']:=data.res;
+  contact.contacts.PUT( http, data, 'image/png' ).Free;
+  contact.contacts.HTTPDestroy( Http );
 end;
 
 procedure TGoogleContactPhoto.setBitmap(const Value: TBitmap);
-type
-  TBSTData = record
-    ETag: Pointer;
-    stream: TStream;
-  end;
-
-var s: String;
+var
   png: TPngImage;
-  fstream: TmemoryStream;
-  p: TBSTData;
   xml: TXMLDocument;
   RootNode: IXMLNode;
   i: integer;
+  data: TKRGoogleRESTRequestData;
+  Response: TStringStream;
 begin
   if(not Assigned(contact.contacts))then exit;
   if(not Assigned(contact.contacts.FGoogleAuth))then exit;
   if Value=nil then begin
     if FETag<>'' then begin
-      FURL:='https://www.google.com/m8/feeds/photos/media/default/'+
-        contact.FID+'?access_token='+contact.contacts.FGoogleAuth.Token;
-      s:=FETag;
-      if Integer(KRRunInThread(Pointer(PChar(s)),DeleteDo))<>0 then FETag:='';
+      contact.contacts.FParams.Clear;
+      contact.contacts.FParams.Add( 'access_token', contact.contacts.FGoogleAuth.Token);
+      data.url := 'https://www.google.com/m8/feeds/photos/media/default/' + contact.FID + contact.contacts.getParams;
+      data.res := FETag;
+      KRRunInThread( @data, DeleteDo );
+      if data.isOk then FETag:='';
     end;
   end else begin
-    fstream:=TmemoryStream.Create;
+    data.sData := TMemoryStream.Create;
     png:=TPngImage.Create;
     try
       png.Assign(Value);
-      png.SaveToStream(fstream);
-      s:=FETag;
-      p.ETag:=Pointer(PChar(s));
-      p.stream:=fstream;
-      FURL:=Fhref+'?access_token='+contact.contacts.FGoogleAuth.Token;
-      if Integer(KRRunInThread(@p,LoadDo))<>0 then begin
-        FURL:='https://www.google.com/m8/feeds/contacts/default/full/'+contact.FID+
-          '?access_token='+contact.contacts.FGoogleAuth.Token+
-          '&fields='+String(HTTPEncode('updated,link(@gd:etag)'));
-        fstream.Clear;
-        KRRunInThread(Pointer(fstream),getEtagDo);
-        if fstream.Size>0 then begin
+      png.SaveToStream( data.sData );
+      data.res := FETag;
+      data.url := Fhref + contact.contacts.getParams;
+      KRRunInThread( @data, LoadDo );
+      {if data.isOk then begin
+        contact.contacts.FParams.Add( 'fields', 'updated,link(@gd:etag)' );
+        data.url := 'https://www.google.com/m8/feeds/contacts/default/full/' + contact.FID + contact.contacts.getParams;
+        Response := TStringStream( KRRunInThread( @data, getEtagDo ) );
+        if data.isOk then begin
           CoInitialize(nil);
           xml:=TXMLDocument.Create(contact.contacts);
           try
-            fstream.Position:=0;
-            xml.LoadFromStream(fstream);
+            Response.Position:=0;
+            xml.LoadFromStream( Response );
             xml.Active:=true;
             RootNode:=xml.DocumentElement;
             if SameText(RootNode.NodeName,'entry') then begin
@@ -1932,16 +2011,97 @@ begin
           finally
             xml.Free;
             CoUninitialize;
+            Response.Free;
           end;
-
         end;
-
-      end;
+      end;}
     finally
       png.Free;
-      fstream.Free;
+      data.sData.Free;
     end;
   end;
+end;
+
+function TGoogleContactPhoto.SetPhoto(AFileName: TFileName): boolean;
+var
+  data: TKRGoogleRESTRequestData;
+  buf: array[0..3] of byte;
+  xml: TXMLDocument;
+  RootNode: IXMLNode;
+  Response: TStringStream;
+  n: integer;
+begin
+  Result:=false;
+  if(not Assigned(contact.contacts))then exit;
+  if(not Assigned(contact.contacts.FGoogleAuth))then exit;
+
+  data.sData:=TMemoryStream.Create;
+  try
+    TMemoryStream( data.sData ).LoadFromFile( AFileName );
+    data.sData.Position:=0;
+    data.sData.Read(buf,4);
+    data.res:='';
+    if(buf[0]=$FF)and(buf[1]=$D8)and(buf[2]=$FF)and(buf[3] shr 4 = $E)then data.res:='image/jpeg'
+    else if(buf[1]=$50)and(buf[2]=$4E)and(buf[3]=$47)then data.res:='image/png';
+    if data.res <> '' then begin
+      data.data := FETag;
+      data.url := Fhref + contact.contacts.getParams;
+      Response := TStringStream( KRRunInThread( @data, SetPhotoDo ) );
+      if data.isOk then begin
+        CoInitialize(nil);
+        xml:=TXMLDocument.Create(contact.contacts);
+        try
+          Response.Position := 0;
+          xml.LoadFromStream( Response );
+          xml.Active:=true;
+
+          Result:=true;
+        finally
+          xml.Free;
+          CoUninitialize;
+          Response.Free;
+        end;
+      end;
+    end;
+
+  except end;
+  if not Result then begin
+    n:=0;
+  end;
+
+  data.sData.Free;
+end;
+
+function TGoogleContactPhoto.SetPhotoDo(AThread: TThread;
+  AData: Pointer): Pointer;
+var
+  http: TKRIdHTTP;
+  data: PKRGoogleRESTRequestData;
+begin
+  data := AData;
+  http:=contact.contacts.HTTPCreate;
+  Http.Request.CustomHeaders.Values['If-Match']:=data.data;
+  data.data:='';
+  result:=Pointer( contact.contacts.PUT( http, data, data.res ) );
+  contact.contacts.HTTPDestroy( Http );
+end;
+
+function TGoogleContactPhoto.thLoadIcon(AThread: TThread;
+  AData: Pointer): Pointer;
+var
+  url: String;
+  http: TKRIdHTTP;
+  bmp: TBitmap;
+begin
+  Http:=contact.contacts.HTTPCreate;
+  Http.Request.Accept := '';
+  url := String( PChar( AData ) );
+
+  bmp:=TBitmap.Create;
+  if not KRDownloadImageToBMP( url, Http, bmp) then FreeAndNil( bmp );
+
+  Result:=Pointer( bmp );
+  contact.contacts.HTTPDestroy( http );
 end;
 
 { TGoogleContactEMail }
@@ -2046,32 +2206,28 @@ end;
 function TKRGoogleContactsGroup.CreateDo(AThread: TThread;
   AData: Pointer): Pointer;
 var
-  http: TIdHTTP;
-  Response: TStringStream;
+  http: TKRIdHTTP;
+  data: PKRGoogleRESTRequestData;
 begin
-  http:=contacts.getHTTP;
-
-  Response:=TStringStream.Create;
-  try
-    Http.Post(FURL,TStream(AData),Response);
-  except end;
-  Result:=Pointer(response);
-
-  Http.IOHandler.Free;
-  Http.Free;
+  data := AData;
+  http := contacts.HTTPCreate;
+  Result:=Pointer( contacts.Post( http, data, 'application/atom+xml' ) );
+  contacts.HTTPDestroy( Http );
 end;
 
 function TKRGoogleContactsGroup.Retrieve: boolean;
 var
-  s: String;
   Response: TStringStream;
   xml: TXMLDocument;
   RootNode: IXMLNode;
+  data: TKRGoogleRESTRequestData;
 begin
   result:=false;
-  s:='https://www.google.com/m8/feeds/groups/default/full/'+FID+'?access_token='+contacts.FGoogleAuth.Token;
-  Response:=TStringStream(KRRunInThread(Pointer(PChar(s)),RetrieveDo));
-  if Response.Size>0 then begin
+  contacts.FParams.Clear;
+  contacts.FParams.Add( 'access_token', contacts.FGoogleAuth.Token);
+  data.url := 'https://www.google.com/m8/feeds/groups/default/full/' + FID + contacts.getParams;
+  Response := TStringStream( KRRunInThread( @data, RetrieveDo ) );
+  if data.isOk then begin
     CoInitialize(nil);
     xml:=TXMLDocument.Create(contacts);
     try
@@ -2089,6 +2245,7 @@ begin
     finally
       xml.Free;
       CoUninitialize;
+      Response.Free;
     end;
   end;
 end;
@@ -2096,19 +2253,13 @@ end;
 function TKRGoogleContactsGroup.RetrieveDo(AThread: TThread;
   AData: Pointer): Pointer;
 var
-  http: TIdHTTP;
-  Response: TStringStream;
+  http: TKRIdHTTP;
+  data: PKRGoogleRESTRequestData;
 begin
-  http:=contacts.getHTTP;
-
-  Response:=TStringStream.Create;
-  try
-    Http.Get(String(PChar(AData)),Response);
-  except end;
-  Result:=Pointer(Response);
-
-  Http.IOHandler.Free;
-  Http.Free;
+  data := AData;
+  http := contacts.HTTPCreate;
+  Result:=Pointer( contacts.GET( http, data ) );
+  contacts.HTTPDestroy( Http );
 end;
 
 procedure TKRGoogleContactsGroup.SetTitle(const Value: String);
@@ -2123,26 +2274,27 @@ function TKRGoogleContactsGroup.Update: boolean;
 var
   xml: TXMLDocument;
   RootNode: IXMLNode;
-  stream: TMemoryStream;
   Response: TStringStream;
-
+  Data: TKRGoogleRESTRequestData;
 begin
   Result:=false;
-  stream:=TMemoryStream.Create;
+  data.sData := TMemoryStream.Create;
+  contacts.FParams.Create;
+  contacts.FParams.Add( 'access_token', contacts.FGoogleAuth.Token);
   if FID<>'' then begin
-    contacts.groupDataToXml('<?xml version="1.0" encoding="UTF-8"?>'#$A+fxml,self,stream);
-    FURL:='https://www.google.com/m8/feeds/groups/default/full/'+FID+'?access_token='+contacts.FGoogleAuth.Token;
-    Response:=TStringStream(KRRunInThread(stream,UpdateDo));
+    contacts.groupDataToXml( '<?xml version="1.0" encoding="UTF-8"?>'#$A + fxml, self, data.sData );
+    data.url := 'https://www.google.com/m8/feeds/groups/default/full/' + FID + contacts.getParams;
+    Response := TStringStream( KRRunInThread( @data, UpdateDo ) );
   end else begin
-    contacts.groupDataToXml('<?xml version="1.0" encoding="UTF-8"?>'#$A+
+    contacts.groupDataToXml( '<?xml version="1.0" encoding="UTF-8"?>'#$A+
       '<entry xmlns="http://www.w3.org/2005/Atom" xmlns:gd="http://schemas.google.com/g/2005">'#$A+
       ' <category scheme="http://schemas.google.com/g/2005#kind" term="http://schemas.google.com/g/2008#group"/>'#$A+
       '</entry>'#$A
-    ,self,stream);
-    FURL:='https://www.google.com/m8/feeds/groups/default/full/'+FID+'?access_token='+contacts.FGoogleAuth.Token;
-    Response:=TStringStream(KRRunInThread(stream,CreateDo));
+    , self, data.sData );
+    data.url := 'https://www.google.com/m8/feeds/groups/default/full/' + FID + contacts.getParams;
+    Response := TStringStream( KRRunInThread( @data, CreateDo ) );
   end;
-  if Response.Size>10 then begin
+  if data.isOk then begin
     CoInitialize(nil);
     xml:=TXMLDocument.Create(contacts);
     try
@@ -2161,31 +2313,23 @@ begin
     finally
       xml.Free;
       CoUninitialize;
+      Response.Free;
     end;
   end;
-  stream.Free;
-  Response.Free;
+  data.sData.Free;
 end;
 
 function TKRGoogleContactsGroup.UpdateDo(AThread: TThread;
   AData: Pointer): Pointer;
 var
-  http: TIdHTTP;
-  Response: TStringStream;
+  http: TKRIdHTTP;
+  data: PKRGoogleRESTRequestData;
 begin
-  http:=contacts.getHTTP;
-  Http.Request.CustomHeaders.Values['If-Match']:=Self.FETag;
-
-  Response:=TStringStream.Create;
-  try
-    Http.Put(FURL,TStream(AData),Response);
-  except on e: EIdHTTPProtocolException do
-    contacts.checkError(e);
-  end;
-
-  Result:=Pointer(response);
-  Http.IOHandler.Free;
-  Http.Free;
+  data := AData;
+  http := contacts.HTTPCreate;
+  Http.Request.CustomHeaders.Values['If-Match']:=FETag;
+  Result:=Pointer( contacts.PUT( http, data, 'application/atom+xml' ) );
+  contacts.HTTPDestroy( Http );
 end;
 
 { TGoogleContactOrganization }
@@ -2277,7 +2421,8 @@ begin
   if Self.FRegion<>'' then sl.Add(Self.FRegion);
   if Self.FCountry.Code>0 then sl.Add(Self.FCountry.ShortName);
   if Self.FPostcode<>'' then sl.Add(Self.FPostcode);
-  Result:=Funcs.Implode(' ',sl);
+  sl.Delimiter := ' ';
+  Result:=sl.DelimitedText;
   sl.Free;
 end;
 
@@ -2307,7 +2452,7 @@ end;
 
 procedure TGoogleContactPostalAddress.SetHousename(const Value: String);
 begin
-  if not SameText(trim(Value),FHousename) then begin
+  if trim(Value)<>FHousename then begin
     FHousename := trim(Value);
     if Assigned(contact) then contact.FModified:=true;
   end;
@@ -2315,7 +2460,7 @@ end;
 
 procedure TGoogleContactPostalAddress.SetLabel(const Value: String);
 begin
-  if not SameText(trim(Value),FLabel) then begin
+  if trim(Value) <> FLabel  then begin
     FLabel := trim(Value);
     if Assigned(contact) then contact.FModified:=true;
   end;
@@ -2323,7 +2468,7 @@ end;
 
 procedure TGoogleContactPostalAddress.SetNeighborhood(const Value: String);
 begin
-  if not SameText(trim(Value),FNeighborhood) then begin
+  if trim(Value) <> FNeighborhood then begin
     FNeighborhood := trim(Value);
     if Assigned(contact) then contact.FModified:=true;
   end;
@@ -2331,7 +2476,7 @@ end;
 
 procedure TGoogleContactPostalAddress.SetPobox(const Value: String);
 begin
-  if not SameText(trim(Value),FPobox) then begin
+  if trim(Value)<>FPobox then begin
     FPobox := trim(Value);
     if Assigned(contact) then contact.FModified:=true;
   end;
@@ -2339,7 +2484,7 @@ end;
 
 procedure TGoogleContactPostalAddress.SetPostcode(const Value: String);
 begin
-  if not SameText(trim(Value),FPostcode) then begin
+  if trim(Value)<>FPostcode then begin
     FPostcode := trim(Value);
     if Assigned(contact) then contact.FModified:=true;
   end;
@@ -2357,7 +2502,7 @@ end;
 
 procedure TGoogleContactPostalAddress.SetRegion(const Value: String);
 begin
-  if not SameText(trim(Value),FRegion) then begin
+  if trim(Value)<>FRegion then begin
     FRegion := trim(Value);
     if Assigned(contact) then contact.FModified:=true;
   end;
@@ -2374,9 +2519,27 @@ end;
 
 procedure TGoogleContactPostalAddress.SetStreet(const Value: String);
 begin
-  if not SameText(trim(Value),FStreet) then begin
+  if trim(Value)<>FStreet then begin
     FStreet := trim(Value);
     if Assigned(contact) then contact.FModified:=true;
+  end;
+end;
+
+{ TGoogleContactWebSite }
+
+procedure TGoogleContactWebSite.SetHref(const Value: String);
+begin
+  if trim(Value) <> FHref then begin
+    FHref := trim(Value);
+    if assigned(contact) then contact.FModified:=true;
+  end;
+end;
+
+procedure TGoogleContactWebSite.SetSiteLabel(const Value: String);
+begin
+  if trim(Value) <> FSiteLabel then begin
+    FSiteLabel := trim(Value);
+    if assigned(contact) then contact.FModified:=true;
   end;
 end;
 

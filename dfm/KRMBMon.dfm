@@ -40,6 +40,7 @@ object KRMBMonForm: TKRMBMonForm
       Top = 6
       Width = 75
       Height = 25
+      Anchors = [akTop, akRight]
       Caption = 'Clear'
       TabOrder = 1
       OnClick = Button1Click

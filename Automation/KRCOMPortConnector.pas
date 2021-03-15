@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRCOMPortConnector                                                        *)
-(*  Ver.: 17.03.2020                                                          *)
+(*  Ver.: 01.03.2021                                                          *)
 (*  https://kandiral.ru/delphi/krcomportconnector.pas.html                    *)
 (*                                                                            *)
 (******************************************************************************)
@@ -167,9 +167,9 @@ begin
     ResetEvent(FOverlapped.hEvent);
     if not(WriteFile(FComPort.Handle, FPk^.Pack^, FPk^.Length, n, @FOverlapped) or
         (GetLastError = ERROR_IO_PENDING))then _error(ceDataNotSended) else begin
-      Signaled := WaitForSingleObject(FOverlapped.hEvent, INFINITE);
+      {Signaled := WaitForSingleObject(FOverlapped.hEvent, INFINITE);
       if not((Signaled = WAIT_OBJECT_0) and
-        (GetOverlappedResult(FComPort.Handle, FOverlapped, n, False))) then _error(ceDataNotSended);
+        (GetOverlappedResult(FComPort.Handle, FOverlapped, n, False))) then _error(ceDataNotSended);  }
     end;
 
   except on E: Exception do begin

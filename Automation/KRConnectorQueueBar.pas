@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRConnectorQueueBar                                                       *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 14.03.2021                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -44,6 +44,52 @@ type
     property Min: Integer read GetMin;
     property Max: Integer read GetMax;
     property StackOut: boolean read FStackOut write FStackOut;
+    property Align;
+    property Anchors;
+    property BorderWidth;
+    property DoubleBuffered;
+    property DragCursor;
+    property DragKind;
+    property DragMode;
+    property Enabled;
+    property Hint;
+    property Constraints;
+    property Orientation;
+    property ParentDoubleBuffered;
+    property ParentShowHint;
+    property PopupMenu;
+    property Smooth;
+    property Style;
+    property MarqueeInterval;
+    property BarColor;
+    property BackgroundColor;
+    property SmoothReverse;
+    property Step;
+    property State;
+    property ShowHint;
+    property TabOrder;
+    property TabStop;
+    property Touch;
+    property Visible;
+    {$IF CompilerVersion >= 24}
+      property StyleElements;
+    {$IFEND}
+    property OnContextPopup;
+    property OnDragDrop;
+    property OnDragOver;
+    property OnEndDock;
+    property OnEndDrag;
+    property OnEnter;
+    property OnExit;
+    property OnGesture;
+    property OnMouseActivate;
+    property OnMouseDown;
+    property OnMouseEnter;
+    property OnMouseLeave;
+    property OnMouseMove;
+    property OnMouseUp;
+    property OnStartDock;
+    property OnStartDrag;
   end;
 
 implementation
@@ -53,14 +99,11 @@ implementation
 constructor TKRConnectorQueueBar.Create(AOwner: TComponent);
 begin
   inherited;
-  Orientation:=pbVertical;
   FStackOut:=false;
-  Height:=57;
-  Width:=25;
   SetupInternalLabel;
   inherited Max:=CE_QUEUE_MAX_ITEMS;
   Enabled:=false;
-  BLabel.Position:=blpRightBottom;
+  BLabel.Position:=blpTopCenter;
 end;
 
 destructor TKRConnectorQueueBar.Destroy;

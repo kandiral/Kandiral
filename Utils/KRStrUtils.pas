@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRStrUtils                                                                *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 06.02.2021                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -12,7 +12,13 @@ unit KRStrUtils;
 
 interface
 
-uses Windows, SysUtils, StrUtils, Classes;
+uses
+  {$IF CompilerVersion >= 23}
+    Winapi.Windows, System.SysUtils, System.StrUtils, System.Classes;
+  {$ELSE}
+    Windows, SysUtils, StrUtils, Classes;
+  {$IFEND}
+
 
 type
   TKRStrAr = array of String;
@@ -55,22 +61,141 @@ type
   procedure KRSplitStrC(AText, ADlm: String; AStrings: TStrings);
   function KRUTF8ToStr(Value: String): String;
   function KRUTF8ToStrSmart(Value: String): String;
+  function KRFastValToHexChar(AVal: UInt8): Char;
+  procedure KRFastByteToHex(bt: UInt8; out Res: String);
+  procedure KRFastWordToHex(wd: UInt16; out Res: String);
+  procedure KRFastDWordToHex(dw: UInt32; out Res: String);
+  function KRFastHexCharToVal(ACh: Char): UInt8;
+  function KRFastHexToByte(s: String): UInt8;
+  function KRFastHexToWord(s: String): UInt16;
+  function KRFastHexToDWord(s: String): UInt32;
+  function KRIntToStrL(ANum, ACnt: UInt32): String;
+  function KRIsIPAddress( Text: String ): Boolean;
+  function KRIsNumber( const AText: String; out AValue: Int32): Boolean;
 
 
 implementation
 
+function KRIsNumber( const AText: String; out AValue: Int32): Boolean;
+var
+  e: Int32;
+begin
+  Val( AText, AValue, e );
+  if e=0 then Result := True else Result := False;
+end;
+
+function KRIsIPAddress( Text: String ): Boolean;
+var
+  sl: TStringList;
+  vl,i: Int32;
+begin
+  Result:=false;
+  sl:=TStringList.Create;
+  try
+    KRSplitStr(Text,'.',sl);
+    if sl.Count=4 then begin
+      Result:=true;
+      for i:=0 to 3 do
+        if not KRIsNumber(sl[i],vl) then begin
+          result:=false;
+          break;
+        end else
+          if(vl<0)or(vl>255)then begin
+            result:=false;
+            break;
+          end;
+    end;
+  finally
+    sl.free;
+  end;
+end;
+
+
+function KRIntToStrL(ANum, ACnt: UInt32): String;
+begin
+  Result:=IntToStr(ANum);
+  while Length(Result)<ACnt do Result:='0'+Result;
+end;
+
+function KRFastValToHexChar(AVal: UInt8): Char;
+begin
+  if AVal>9 then Result:=Chr(AVal+55) else Result:=Chr(AVal+48)
+end;
+
+procedure KRFastByteToHex(bt: UInt8; out Res: String);
+begin
+  SetLength(Res,2);
+  Res[1]:=KRFastValToHexChar(bt shr 4);
+  Res[2]:=KRFastValToHexChar(bt and $f);
+end;
+
+procedure KRFastWordToHex(wd: UInt16; out Res: String);
+begin
+  SetLength(Res,4);
+  Res[1]:=KRFastValToHexChar(wd shr 12);
+  Res[2]:=KRFastValToHexChar((wd shr 8) and $f);
+  Res[3]:=KRFastValToHexChar((wd shr 4) and $f);
+  Res[4]:=KRFastValToHexChar(wd and $f);
+end;
+
+procedure KRFastDWordToHex(dw: UInt32; out Res: String);
+begin
+  SetLength(Res, 8);
+  Res[1]:=KRFastValToHexChar(dw shr 28);
+  Res[2]:=KRFastValToHexChar((dw shr 24) and $f);
+  Res[3]:=KRFastValToHexChar((dw shr 20) and $f);
+  Res[4]:=KRFastValToHexChar((dw shr 16) and $f);
+  Res[5]:=KRFastValToHexChar((dw shr 12) and $f);
+  Res[6]:=KRFastValToHexChar((dw shr 8) and $f);
+  Res[7]:=KRFastValToHexChar((dw shr 4) and $f);
+  Res[8]:=KRFastValToHexChar(dw and $f);
+end;
+
+function KRFastHexCharToVal(ACh: Char): UInt8;
+var bt: byte;
+begin
+  bt:=Ord(ACh);
+  if bt>57 then Result:=bt-55 else Result:=bt-48;
+end;
+
+function KRFastHexToByte(s: String): UInt8;
+begin
+  Result:=(KRFastHexCharToVal(s[1]) shl 4) or KRFastHexCharToVal(s[2]);
+end;
+
+function KRFastHexToWord(s: String): UInt16;
+begin
+  Result:=(Word(KRFastHexToByte(copy(s,1,2))) shl 8) or KRFastHexToByte(copy(s,3,2));
+end;
+
+function KRFastHexToDWord(s: String): UInt32;
+begin
+  result:=(Cardinal(KRFastHexToWord(copy(s,1,4))) shl 16) or KRFastHexToWord(copy(s,5,4));
+end;
+
 function KRDelSpaces(S: String): String;
 var
-  i: integer;
+  i,j,n: uint32;
 begin
-  Result:='';
-  for i:=1 to Length(S) do
-   if not((S[i]=#9)or(S[i]=#10)or(S[i]=#13)or(S[i]=#32)or(S[i]=#160)) then Result:=Result+S[i];
+  S:=Trim(s);
+  n:=Length(s);
+  SetLength(Result,n);
+  dec(n);
+  j:=0;
+  for i:=2 to n do begin
+   if (S[i]=#9) or (S[i]=#10) or (S[i]=#13) or (S[i]=#32) or (S[i]=#160) then continue;
+   Result[j]:=S[i];
+   inc(j);
+  end;
+  SetLength(Result,j);
 end;
 
 function KRIsNum(Ch: Char): boolean;
+var
+  n: uint32;
 begin
-  Result:=(Ord(Ch)>47)and(Ord(Ch)<58);
+  n:=Ord(n);
+  Result:=(n>47)and(n<58);
 end;
 
 function KRStrExist(Str,SubStr: String): boolean;

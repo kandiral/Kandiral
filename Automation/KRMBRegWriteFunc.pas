@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRMBRegWriteFunc                                                          *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 17.02.2021                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -18,10 +18,10 @@ uses
   {$ELSE}
     Classes, Controls, StdCtrls, Messages, SysUtils,
   {$IFEND}
-    KRModbusClient;
+    KRModbusClient, KRComboBox;
 
 type
-  TKRMBRegWriteFunc = class(TCustomComboBox)
+  TKRMBRegWriteFunc = class(TKRComboBox)
   private
     FChange: TNotifyEvent;
     FVariable: TKRMBRegister;

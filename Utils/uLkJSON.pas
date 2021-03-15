@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  uLkJSON                                                                   *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 16.02.2021                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -147,7 +147,7 @@ type
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
 
-    function getInt(idx: Integer): Integer; virtual;
+    function getInt(idx: Integer): Int64; virtual;
     function getString(idx: Integer): string; virtual;
     function getWideString(idx: Integer): WideString; virtual;
     function getDouble(idx: Integer): Double; virtual;
@@ -314,7 +314,7 @@ type
     property NameOf[idx: Integer]: WideString read GetNameOf;
 
     function getDouble(idx: Integer): Double; overload; override;
-    function getInt(idx: Integer): Integer; overload; override;
+    function getInt(idx: Integer): Int64; overload; override;
     function getString(idx: Integer): string; overload; override;
     function getWideString(idx: Integer): WideString; overload; override;
     function getBoolean(idx: Integer): Boolean; overload; override;
@@ -351,7 +351,7 @@ function GenerateReadableText(vObj: TlkJSONbase; var vLevel:
 
 implementation
 
-uses math,strutils;
+uses math,strutils,WideStrUtils;
 
 type
   ElkIntException = class(Exception)
@@ -453,16 +453,16 @@ end;
 
 function code2utf(iNumber: Integer): UTF8String;
 begin
-  if iNumber < 128 then Result := chr(iNumber)
+  if iNumber < 128 then Result := ansichar(iNumber)
   else if iNumber < 2048 then
-    Result := chr((iNumber shr 6) + 192) + chr((iNumber and 63) + 128)
+    Result := ansichar((iNumber shr 6) + 192) + ansichar((iNumber and 63) + 128)
   else if iNumber < 65536 then
-    Result := chr((iNumber shr 12) + 224) + chr(((iNumber shr 6) and
-      63) + 128) + chr((iNumber and 63) + 128)
+    Result := ansichar((iNumber shr 12) + 224) + ansichar(((iNumber shr 6) and
+      63) + 128) + ansichar((iNumber and 63) + 128)
   else if iNumber < 2097152 then
-    Result := chr((iNumber shr 18) + 240) + chr(((iNumber shr 12) and
-      63) + 128) + chr(((iNumber shr 6) and 63) + 128) +
-      chr((iNumber and 63) + 128);
+    Result := ansichar((iNumber shr 18) + 240) + ansichar(((iNumber shr 12) and
+      63) + 128) + ansichar(((iNumber shr 6) and 63) + 128) +
+      ansichar((iNumber and 63) + 128);
 end;
 
 { TlkJSONbase }
@@ -770,7 +770,7 @@ begin
   else result := jn.Value;
 end;
 
-function TlkJSONcustomlist.getInt(idx: Integer): Integer;
+function TlkJSONcustomlist.getInt(idx: Integer): Int64;
 var
   jn: TlkJSONnumber;
 begin
@@ -1159,7 +1159,7 @@ begin
   else result := jn.Value;
 end;
 
-function TlkJSONobject.getInt(idx: Integer): Integer;
+function TlkJSONobject.getInt(idx: Integer): Int64;
 var
   jn: TlkJSONnumber;
 begin
@@ -1747,11 +1747,9 @@ var
     inc(idx);
 
     js := TlkJSONstring.Create;
-{$ifdef USE_D2009}
-    js.FValue := UTF8ToString(ws);
-{$else}
-    js.FValue := UTF8Decode(ws);
-{$endif}
+
+    if DetectUTF8Encoding(ws) = etUTF8 then js.FValue := UTF8Decode(ws) else js.FValue := ws;
+
     add_child(o, TlkJSONbase(js));
     ridx := idx;
   end;

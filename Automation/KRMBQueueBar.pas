@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRMBQueueBar                                                              *)
-(*  Ver.: 15.04.2019                                                          *)
+(*  Ver.: 18.02.2021                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -52,7 +52,6 @@ implementation
 constructor TKRMBQueueBar.Create(AOwner: TComponent);
 begin
   inherited;
-  Self.Orientation:=pbVertical;
   Height:=57;
   Width:=25;
   SetupInternalLabel;

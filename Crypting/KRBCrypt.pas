@@ -1,3 +1,13 @@
+(******************************************************************************)
+(*                                                                            *)
+(*  Kandiral Ruslan                                                           *)
+(*  https://kandiral.ru                                                       *)
+(*                                                                            *)
+(*  KRBCrypt                                                                  *)
+(*  Ver.: 28.01.2021                                                          *)
+(*                                                                            *)
+(*                                                                            *)
+(******************************************************************************)
 unit KRBCrypt;
 
 interface
@@ -14,7 +24,7 @@ uses
 
   procedure KRBCrypt_Hash(AStream: TStream; Algoritm: String; var Hash: TBytes);
   procedure KRBCrypt_SHA1(AStream: TStream; var Hash: TKRSHA1Hash);
-  //procedure KRBCrypt_MD5(AStream: TStream; var Hash: TKRMD5Hash);
+  procedure KRBCrypt_MD5(AStream: TStream; var Hash: TKRMD5Hash);
 
 
 
@@ -361,6 +371,14 @@ var
 begin
   KRBCrypt_Hash(AStream, BCRYPT_SHA1_ALGORITHM, _hash);
   Move((@_hash[0])^,(@Hash.bytes[0])^,20);
+end;
+
+procedure KRBCrypt_MD5(AStream: TStream; var Hash: TKRMD5Hash);
+var
+  _hash: TBytes;
+begin
+  KRBCrypt_Hash(AStream, BCRYPT_MD5_ALGORITHM, _hash);
+  Move((@_hash[0])^,(@Hash.bytes[0])^,16);
 end;
 
 procedure KRBCrypt_Hash(AStream: TStream; Algoritm: String; var Hash: TBytes);
