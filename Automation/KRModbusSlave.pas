@@ -143,7 +143,7 @@ function MBSRTUReadHoldingRegisters(AAddr: byte; AData: TKRRegisters;
     AFrom: byte; ABuffer: PKRBuffer): Byte;
 begin
   Result:=MBSReadHoldingRegisters(AAddr,AData,0,ABuffer);
-  KRCRC16(ABuffer,Result,ABuffer^[Result+1],ABuffer^[Result]);
+  KRCRC16( PByte( ABuffer ), Result, ABuffer^[ Result + 1 ], ABuffer^[ Result ] );
   Result:=Result+2;
 end;
 
@@ -151,7 +151,7 @@ function MBSRTUReadInputRegisters(AAddr: byte; AData: TKRRegisters;
     AFrom: byte; ABuffer: PKRBuffer): Byte;
 begin
   Result:=MBSReadInputRegisters(AAddr,AData,0,ABuffer);
-  KRCRC16(ABuffer,Result,ABuffer^[Result+1],ABuffer^[Result]);
+  KRCRC16( PByte( ABuffer ),Result,ABuffer^[Result+1],ABuffer^[Result]);
   Result:=Result+2;
 end;
 
@@ -159,7 +159,7 @@ function MBSRTUWriteHoldingRegister(AAddr: byte; AStartReg: Word;
     AData: Word; AFrom: byte; ABuffer: PKRBuffer): Byte;
 begin
   Result:=MBSWriteHoldingRegister(AAddr,AStartReg,AData,0,ABuffer);
-  KRCRC16(ABuffer,Result,ABuffer^[Result+1],ABuffer^[Result]);
+  KRCRC16( PByte( ABuffer ),Result,ABuffer^[Result+1],ABuffer^[Result]);
   Result:=Result+2;
 end;
 
@@ -167,7 +167,7 @@ function MBSRTUWriteHoldingRegisters(AAddr: byte; AStartReg, ACount: Word;
     AFrom: byte; ABuffer: PKRBuffer): Byte;
 begin
   Result:=MBSWriteHoldingRegisters(AAddr,AStartReg,ACount,0,ABuffer);
-  KRCRC16(ABuffer,Result,ABuffer^[Result+1],ABuffer^[Result]);
+  KRCRC16( PByte( ABuffer ),Result,ABuffer^[Result+1],ABuffer^[Result]);
   Result:=Result+2;
 end;
 
@@ -175,7 +175,7 @@ function MBSRTUError(AAddr, AFunc, AError: byte; AFrom: byte;
     ABuffer: PKRBuffer): Byte;
 begin
   Result:=MBSError(AAddr,AFunc,AError,0,ABuffer);
-  KRCRC16(ABuffer,Result,ABuffer^[Result+1],ABuffer^[Result]);
+  KRCRC16( PByte( ABuffer ),Result,ABuffer^[Result+1],ABuffer^[Result]);
   Result:=Result+2;
 end;
 

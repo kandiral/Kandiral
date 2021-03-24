@@ -72,7 +72,6 @@ contains
   KRCommonRegister in 'KRCommonRegister.pas',
   KRUDPSocketServer in '..\..\Net\KRUDPSocketServer.pas',
   KRBLEdit in '..\..\Common\KRBLEdit.pas',
-  uLkJSON in '..\..\Utils\uLkJSON.pas',
   ISO3166 in '..\..\ISO\ISO3166.pas',
   KRBase64 in '..\..\Crypting\KRBase64.pas',
   KRBCrypt in '..\..\Crypting\KRBCrypt.pas',
@@ -86,6 +85,7 @@ contains
   KRValueEditLng in '..\..\Common\KRValueEditLng.pas',
   KRThreadEvent in '..\..\Common\KRThreadEvent.pas',
   KRThreadQueueEvent in '..\..\Common\KRThreadQueueEvent.pas',
-  KRKernel32 in '..\..\Windows\KRKernel32.pas';
+  KRKernel32 in '..\..\Windows\KRKernel32.pas',
+  KRJSON in '..\..\Utils\KRJSON.pas';
 
 end.

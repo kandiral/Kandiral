@@ -139,7 +139,6 @@
         <DCCReference Include="..\..\Utils\lgop.pas"/>
         <DCCReference Include="..\..\Net\KRUDPSocketServer.pas"/>
         <DCCReference Include="..\..\Common\KRBLEdit.pas"/>
-        <DCCReference Include="..\..\Utils\uLkJSON.pas"/>
         <DCCReference Include="..\..\Common\KRThreadEvent.pas"/>
         <DCCReference Include="..\..\Common\KRThreadQueueEvent.pas"/>
         <DCCReference Include="..\..\Common\KRValueEditLng.pas"/>
@@ -154,6 +153,7 @@
         <DCCReference Include="..\..\Utils\KRUtils.pas"/>
         <DCCReference Include="..\..\Utils\KRVariants.pas"/>
         <DCCReference Include="..\..\Windows\KRKernel32.pas"/>
+        <DCCReference Include="..\..\Utils\KRJSON.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

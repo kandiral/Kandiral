@@ -1,13 +1,13 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <BorlandProject>
 	<Transactions>
-    <Transaction>1899.12.30 00:00:00.000.883,C:\Users\kandiral\Documents\Embarcadero\Studio\Projects\Package1.dproj=X:\Components\Kandiral\packages\d260\KRFile.dproj</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.312,=X:\Components\Kandiral\File\KROpenFolderDlg.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.665,=X:\Components\Kandiral\packages\d260\KRFileRegister.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.234,=X:\Components\Kandiral\File\KRDriveComboBox.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.337,=KRCommon.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.883,X:\Components\Kandiral\packages\d260\KRFile.dproj=C:\Users\kandiral\Documents\Embarcadero\Studio\Projects\Package1.dproj</Transaction>
     <Transaction>1899.12.30 00:00:00.000.969,=designide.dcp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.281,=X:\Components\Kandiral\File\KRFileList.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.619,=rtl.dcp</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.312,=X:\Components\Kandiral\File\KROpenFolderDlg.pas</Transaction>
   </Transactions>
 </BorlandProject>

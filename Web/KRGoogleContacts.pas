@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRGoogleContacts                                                          *)
-(*  Ver.: 14.03.2021                                                          *)
+(*  Ver.: 23.03.2021                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -157,8 +157,9 @@ type
   public
     procedure Assign(APhoto: TGoogleContactPhoto);
     property ETag: String read FETag;
-    //property Bitmap: TBitmap read getBitmap write setBitmap;
+    property Bitmap: TBitmap read getBitmap;
     function SetPhoto( AFileName: TFileName ): boolean;
+    function DelPhoto: boolean;
   end;
 
   TGoogleContactWebSite = class
@@ -169,8 +170,22 @@ type
     procedure SetHref(const Value: String);
     procedure SetSiteLabel(const Value: String);
   public
+    procedure Assign(AWebSite: TGoogleContactWebSite);
     property Href: String read FHref write SetHref;
     property SiteLabel: String read FSiteLabel write SetSiteLabel;
+  end;
+
+  TGoogleContactDefinedField = class
+  private
+    contact: TGoogleContact;
+    FKey: String;
+    FValue: String;
+    procedure SetKey(const Value: String);
+    procedure SetValue(const Value: String);
+  public
+    procedure Assign(ADefinedField: TGoogleContactDefinedField);
+    property Key: String read FKey write SetKey;
+    property Value: String read FValue write SetValue;
   end;
 
   TGoogleContactName = class
@@ -206,7 +221,9 @@ type
     FUpdated: TDateTime;
     FModified: boolean;
 
-    FEmailList, FPhoneList, FOrganizationList, FPostalAddressList, FWebSiteList: TList;
+    FEmailList, FPhoneList, FOrganizationList, FPostalAddressList, FWebSiteList,
+      FDefinedFieldList: TList;
+
     FNotes: String;
     FDeleted: boolean;
     FGroups: TStringList;
@@ -226,6 +243,8 @@ type
     function GetGroupsCount: integer;
     function GetWebSite(AIndex: Integer): TGoogleContactWebSite;
     function GetWebSiteCount: integer;
+    function GetDefinedField(AIndex: Integer): TGoogleContactDefinedField;
+    function GetDefinedFieldCount: integer;
   public
     constructor Create;
     destructor Destroy; override;
@@ -256,6 +275,11 @@ type
     property WebSites[AIndex: Integer]: TGoogleContactWebSite read GetWebSite;
     function WebSiteAdd(AHref: String; ALabel: String = ''): TGoogleContactWebSite;
     procedure WebSiteDelete(AIndex: integer);
+
+    property DefinedFieldCount: integer read GetDefinedFieldCount;
+    property DefinedFields[AIndex: Integer]: TGoogleContactDefinedField read GetDefinedField;
+    function DefinedFieldAdd(AKey, AValue: String): TGoogleContactDefinedField;
+    procedure DefinedFieldDelete(AIndex: integer);
 
     property PhoneCount: integer read GetPhoneCount;
     property Phones[AIndex: Integer]: TGoogleContactPhone read GetPhone;
@@ -769,6 +793,8 @@ begin
       s:='';
       if entry.ChildNodes[j].HasAttribute('label') then s:=entry.ChildNodes[j].Attributes['label'];
       cntct.WebSiteAdd( entry.ChildNodes[j].Attributes['href'], s);
+    end else if SameText(entry.ChildNodes[j].NodeName,'gContact:userDefinedField') then begin
+      cntct.DefinedFieldAdd( entry.ChildNodes[j].Attributes['key'], entry.ChildNodes[j].Attributes['value']);
     end else if SameText(entry.ChildNodes[j].NodeName,'link') then begin
       s:=entry.ChildNodes[j].Attributes['rel'];
       if SameText(s,'http://schemas.google.com/contacts/2008/rel#photo') then begin
@@ -936,7 +962,7 @@ function TKRGoogleContacts.RetrievingAllDo(AThread: TThread;
 var
   http: TKRIdHTTP;
   data: PKRGoogleRESTRequestData;
-  Response: TStringStream;
+  Response: TMemoryStream;
   xml, xmlFull: TXMLDocument;
   RootNode, fr: IXMLNode;
   cnt, totalResults, itemsPerPage: integer;
@@ -1084,7 +1110,7 @@ function TKRGoogleContacts.RetrievingGroupsDo(AThread: TThread;
 var
   http: TKRIdHTTP;
   data: PKRGoogleRESTRequestData;
-  Response: TStringStream;
+  Response: TMemoryStream;
   xml: TXMLDocument;
   RootNode: IXMLNode;
   i, cnt, totalResults, itemsPerPage: integer;
@@ -1201,7 +1227,7 @@ procedure TKRGoogleContacts.userDataToXml(AXML: String; cntct: TGoogleContact;
 var
   xml: TXMLDocument;
   RootNode, tmp, title, nm, content, appEdited: IXMLNode;
-  phns, mls, orgs, adrs, grps, sites: array of IXMLNode;
+  phns, mls, orgs, adrs, grps, sites, dfields: array of IXMLNode;
   i: integer;
 begin
   CoInitialize(nil);
@@ -1229,6 +1255,9 @@ begin
       end else if SameText(RootNode.ChildNodes[i].NodeName,'gContact:website') then begin
         SetLength(sites,Length(sites)+1);
         sites[Length(sites)-1]:=RootNode.ChildNodes[i];
+      end else if SameText(RootNode.ChildNodes[i].NodeName,'gContact:userDefinedField') then begin
+        SetLength(dfields,Length(dfields)+1);
+        dfields[Length(dfields)-1]:=RootNode.ChildNodes[i];
       end else if SameText(RootNode.ChildNodes[i].NodeName,'gd:email') then begin
         SetLength(mls,Length(mls)+1);
         mls[Length(mls)-1]:=RootNode.ChildNodes[i];
@@ -1276,6 +1305,14 @@ begin
       tmp.Attributes['xmlns:gContact']:='http://schemas.google.com/contact/2008';
       tmp.Attributes['href']:= TGoogleContactWebSite( cntct.FWebSiteList[i] ).FHref;
       tmp.Attributes['label']:= TGoogleContactWebSite( cntct.FWebSiteList[i] ).FSiteLabel;
+    end;
+
+    for i := 0 to Length(dfields)-1 do RootNode.ChildNodes.Remove(dfields[i]);
+    for i := 0 to cntct.FDefinedFieldList.Count-1 do begin
+      tmp:=RootNode.AddChild('gContact:userDefinedField');
+      tmp.Attributes['xmlns:gContact']:='http://schemas.google.com/contact/2008';
+      tmp.Attributes['key']:= TGoogleContactDefinedField( cntct.FDefinedFieldList[i] ).FKey;
+      tmp.Attributes['value']:= TGoogleContactDefinedField( cntct.FDefinedFieldList[i] ).FValue;
     end;
 
     for I := 0 to Length(mls)-1 do RootNode.ChildNodes.Remove(mls[i]);
@@ -1431,6 +1468,8 @@ var
   Phone: TGoogleContactPhone;
   Organization: TGoogleContactOrganization;
   PostalAddress: TGoogleContactPostalAddress;
+  WebSite: TGoogleContactWebSite;
+  DefinedField: TGoogleContactDefinedField;
 begin
   contacts:=AContact.contacts;
   FID:=AContact.FID;
@@ -1483,6 +1522,23 @@ begin
     FPostalAddressList.Add(PostalAddress);
   end;
 
+  for I := 0 to FWebSiteList.Count-1 do TGoogleContactWebSite(FWebSiteList[i]).Free;
+  FWebSiteList.Clear;
+  for I := 0 to AContact.WebSiteCount-1 do begin
+    WebSite:=TGoogleContactWebSite.Create;
+    WebSite.Assign(AContact.WebSites[i]);
+    WebSite.contact:=self;
+    FWebSiteList.Add(WebSite);
+  end;
+
+  for I := 0 to FDefinedFieldList.Count-1 do TGoogleContactDefinedField(FDefinedFieldList[i]).Free;
+  FDefinedFieldList.Clear;
+  for I := 0 to AContact.DefinedFieldCount-1 do begin
+    DefinedField:=TGoogleContactDefinedField.Create;
+    DefinedField.Assign(AContact.DefinedFields[i]);
+    DefinedField.contact:=self;
+    FDefinedFieldList.Add(DefinedField);
+  end;
 
 end;
 
@@ -1498,6 +1554,7 @@ begin
   FOrganizationList:=TList.Create;
   FPostalAddressList:=TList.Create;
   FWebSiteList:=TList.Create;
+  FDefinedFieldList:=TList.Create;
 end;
 
 function TGoogleContact.CreateDo(AThread: TThread; AData: Pointer): Pointer;
@@ -1509,6 +1566,24 @@ begin
   http := contacts.HTTPCreate;
   Result:=Pointer( contacts.Post( http, data, 'application/atom+xml' ) );
   contacts.HTTPDestroy( Http );
+end;
+
+function TGoogleContact.DefinedFieldAdd(AKey,
+  AValue: String): TGoogleContactDefinedField;
+begin
+  Result:=TGoogleContactDefinedField.Create;
+  Result.contact:=self;
+  Result.FKey:=AKey;
+  Result.FValue:=AValue;
+  FDefinedFieldList.Add(Result);
+  FModified:=true;
+end;
+
+procedure TGoogleContact.DefinedFieldDelete(AIndex: integer);
+begin
+  TGoogleContactDefinedField(FDefinedFieldList[AIndex]).Free;
+  FDefinedFieldList.Delete(AIndex);
+  FModified:=true;
 end;
 
 destructor TGoogleContact.Destroy;
@@ -1527,6 +1602,8 @@ begin
   FPostalAddressList.Free;
   for I := 0 to FWebSiteList.Count-1 do TGoogleContactWebSite(FWebSiteList[i]).Free;
   FWebSiteList.Free;
+  for I := 0 to FDefinedFieldList.Count-1 do TGoogleContactDefinedField(FDefinedFieldList[i]).Free;
+  FDefinedFieldList.Free;
   FGroups.Free;
   inherited;
 end;
@@ -1550,6 +1627,17 @@ begin
   TGoogleContactEmail(FEmailList[AIndex]).Free;
   FEmailList.Delete(AIndex);
   FModified:=true;
+end;
+
+function TGoogleContact.GetDefinedField(
+  AIndex: Integer): TGoogleContactDefinedField;
+begin
+  result:=TGoogleContactDefinedField(FDefinedFieldList[AIndex]);
+end;
+
+function TGoogleContact.GetDefinedFieldCount: integer;
+begin
+  Result:=FDefinedFieldList.Count;
 end;
 
 function TGoogleContact.GetEmail(AIndex: Integer): TGoogleContactEMail;
@@ -1606,7 +1694,8 @@ end;
 
 function TGoogleContact.GetWebSite(AIndex: Integer): TGoogleContactWebSite;
 begin
-  result:=TGoogleContactWebSite(FWebSiteList[AIndex]);end;
+  result:=TGoogleContactWebSite(FWebSiteList[AIndex]);
+end;
 
 function TGoogleContact.GetWebSiteCount: integer;
 begin
@@ -1854,6 +1943,27 @@ begin
   contact.contacts.HTTPDestroy( Http );
 end;
 
+function TGoogleContactPhoto.DelPhoto: boolean;
+var
+  png: TPngImage;
+  xml: TXMLDocument;
+  RootNode: IXMLNode;
+  i: integer;
+  data: TKRGoogleRESTRequestData;
+  Response: TStringStream;
+begin
+  if(not Assigned(contact.contacts))then exit;
+  if(not Assigned(contact.contacts.FGoogleAuth))then exit;
+  if FETag<>'' then begin
+    contact.contacts.FParams.Clear;
+    contact.contacts.FParams.Add( 'access_token', contact.contacts.FGoogleAuth.Token);
+    data.url := 'https://www.google.com/m8/feeds/photos/media/default/' + contact.FID + contact.contacts.getParams;
+    data.res := FETag;
+    KRRunInThread( @data, DeleteDo );
+    if data.isOk then FETag:='';
+  end;
+end;
+
 function TGoogleContactPhoto.getBitmap: TBitmap;
 var
   ini: TIniFile;
@@ -1869,8 +1979,8 @@ var
 
 begin
   result:=nil;
-  if(not Assigned(contact.contacts))then exit;
-  if(not Assigned(contact.contacts.FGoogleAuth))then exit;
+  if(not Assigned( contact.contacts ))then exit;
+  if(not Assigned( contact.contacts.FGoogleAuth ))then exit;
   if FEtag<>'' then begin
     ini:=TIniFile.Create( contact.contacts.FDataFolder + 'contacts.ini' );
     try
@@ -2044,7 +2154,7 @@ begin
     if(buf[0]=$FF)and(buf[1]=$D8)and(buf[2]=$FF)and(buf[3] shr 4 = $E)then data.res:='image/jpeg'
     else if(buf[1]=$50)and(buf[2]=$4E)and(buf[3]=$47)then data.res:='image/png';
     if data.res <> '' then begin
-      data.data := FETag;
+      data.res1 := FETag;
       data.url := Fhref + contact.contacts.getParams;
       Response := TStringStream( KRRunInThread( @data, SetPhotoDo ) );
       if data.isOk then begin
@@ -2080,8 +2190,7 @@ var
 begin
   data := AData;
   http:=contact.contacts.HTTPCreate;
-  Http.Request.CustomHeaders.Values['If-Match']:=data.data;
-  data.data:='';
+  Http.Request.CustomHeaders.Values['If-Match']:=data.res1;
   result:=Pointer( contact.contacts.PUT( http, data, data.res ) );
   contact.contacts.HTTPDestroy( Http );
 end;
@@ -2527,6 +2636,12 @@ end;
 
 { TGoogleContactWebSite }
 
+procedure TGoogleContactWebSite.Assign(AWebSite: TGoogleContactWebSite);
+begin
+  FHref := AWebSite.FHref;
+  FSiteLabel := AWebSite.FSiteLabel;
+end;
+
 procedure TGoogleContactWebSite.SetHref(const Value: String);
 begin
   if trim(Value) <> FHref then begin
@@ -2539,6 +2654,31 @@ procedure TGoogleContactWebSite.SetSiteLabel(const Value: String);
 begin
   if trim(Value) <> FSiteLabel then begin
     FSiteLabel := trim(Value);
+    if assigned(contact) then contact.FModified:=true;
+  end;
+end;
+
+{ TGoogleContactDefinedField }
+
+procedure TGoogleContactDefinedField.Assign(
+  ADefinedField: TGoogleContactDefinedField);
+begin
+  FKey := ADefinedField.FKey;
+  FValue := ADefinedField.FValue;
+end;
+
+procedure TGoogleContactDefinedField.SetKey(const Value: String);
+begin
+  if trim(Value) <> FKey then begin
+    FKey := trim(Value);
+    if assigned(contact) then contact.FModified:=true;
+  end;
+end;
+
+procedure TGoogleContactDefinedField.SetValue(const Value: String);
+begin
+  if trim(Value) <> FValue then begin
+    FValue := trim(Value);
     if assigned(contact) then contact.FModified:=true;
   end;
 end;

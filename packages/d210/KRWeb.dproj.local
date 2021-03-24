@@ -4,20 +4,41 @@
     <Transaction>1899.12.30 00:00:00.000.460,=X:\Components\Kandiral\Web\KRWebDownload.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.011,=rtl.dcp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.450,=inet.dcp</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.338,=designide.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.447,=KRCommon.dcp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.218,=X:\Components\Kandiral\Web\KRGoogleContacts.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.480,=X:\Components\Kandiral\packages\d210\KRWebRegister.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.234,=X:\Components\Kandiral\Web\KRGoogleAPI.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.446,=X:\Components\Kandiral\Web\KRWebCommon.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.864,=X:\Components\Kandiral\Web\KRGoogleSearchConsole.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.432,=X:\Components\Kandiral\Web\KRIdHTTP.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.243,=X:\Components\Kandiral\Web\KRGoogleSheets.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.418,=X:\Components\Kandiral\Web\KRGoogleTranslate.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.446,=X:\Components\Kandiral\Web\KRWebCommon.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.234,=X:\Components\Kandiral\Web\KRGoogleAPI.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.130,=KRAutomation.dcp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.185,=X:\Components\Kandiral\Web\KRGoogleAuth.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.473,=vclie.dcp</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.447,=KRCommon.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.338,=designide.dcp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.289,=X:\Components\Kandiral\Web\KRGoogleCommon.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.746,X:\Components\Kandiral\packages\d210\KRWeb.dproj=C:\Users\kandiral\Documents\Embarcadero\Studio\Projects\Package1.dproj</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.746,C:\Users\kandiral\Documents\Embarcadero\Studio\Projects\Package1.dproj=X:\Components\Kandiral\packages\d210\KRWeb.dproj</Transaction>
   </Transactions>
+	<ProjectSortOrder AutoSort="0" SortType="0">
+    <File Path="..\..\..\Kandiral"/>
+    <File Path="..\..\Web"/>
+    <File Path="..\..\Web\KRGoogleAPI.pas"/>
+    <File Path="..\..\Web\KRGoogleAuth.pas"/>
+    <File Path="..\..\Web\KRGoogleCommon.pas"/>
+    <File Path="..\..\Web\KRGoogleContacts.pas"/>
+    <File Path="..\..\Web\KRGoogleSearchConsole.pas"/>
+    <File Path="..\..\Web\KRGoogleSheets.pas"/>
+    <File Path="..\..\Web\KRGoogleTranslate.pas"/>
+    <File Path="..\..\Web\KRIdHTTP.pas"/>
+    <File Path="..\..\Web\KRWebCommon.pas"/>
+    <File Path="..\..\Web\KRWebDownload.pas"/>
+    <File Path="KRWebRegister.pas"/>
+    <File Path="designide.dcp"/>
+    <File Path="inet.dcp"/>
+    <File Path="KRAutomation.dcp"/>
+    <File Path="KRCommon.dcp"/>
+    <File Path="rtl.dcp"/>
+    <File Path="vclie.dcp"/>
+  </ProjectSortOrder>
 </BorlandProject>

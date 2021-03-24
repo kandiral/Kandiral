@@ -21,7 +21,7 @@ uses
   KRServer, KRTypes, KRCRC, KRWindows;
 
 type
-  TKRTPServerData = procedure (Sender: TObject; ABuffer: PKRBuffer; var ALength: integer) of object;
+  TKRTPServerData = procedure (Sender: TObject; ABuffer: PKRBuffer2k; var ALength: integer) of object;
 
   TKRTPServer = class(TComponent)
   private
@@ -29,9 +29,9 @@ type
     FTPName: String;
     FData: TKRTPServerData;
     procedure SetServer(const Value: TKRServer);
-    procedure cb(Sender: TObject; APack: PKRBuffer; var ALength: integer);
-    function BuildResp(Sender: TObject; APack: PKRBuffer; ALength: integer): integer;
-    function funcGetName(APack: PKRBuffer): integer;
+    procedure cb(Sender: TObject; APack: PKRBuffer2k; var ALength: integer);
+    function BuildResp(Sender: TObject; APack: PKRBuffer2k; ALength: integer): integer;
+    function funcGetName(APack: PKRBuffer2k): integer;
   protected
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
   public
@@ -47,7 +47,7 @@ implementation
 
 { TKRTPServer }
 
-function TKRTPServer.BuildResp(Sender: TObject; APack: PKRBuffer; ALength: integer): integer;
+function TKRTPServer.BuildResp(Sender: TObject; APack: PKRBuffer2k; ALength: integer): integer;
 begin
   Result:=0;
   case APack^[2] of
@@ -59,14 +59,14 @@ begin
     end;
   end;
   APack^[Result-3]:=35;
-  KRCRC16(APack,Result-2,APack^[Result-2],APack^[Result-1]);
+  KRCRC16( @APack^[0], Result-2, APack^[ Result - 2 ], APack^[ Result - 1 ] );
 end;
 
-procedure TKRTPServer.cb(Sender: TObject; APack: PKRBuffer; var ALength: integer);
+procedure TKRTPServer.cb(Sender: TObject; APack: PKRBuffer2k; var ALength: integer);
 begin
   if(ALength>5)then begin
     if(APack^[0]=126)and(APack^[ALength-3]=64)then begin
-      if KRCRC16(APack,ALength-2)=MakeWord(APack^[ALength-1],APack^[ALength-2]) then begin
+      if KRCRC16( @APack^[0], ALength - 2 ) = MakeWord( APack^[ ALength - 1 ], APack^[ ALength - 2 ] ) then begin
         ALength:=buildResp(Sender,APack,ALength);
         exit;
       end;
@@ -90,7 +90,7 @@ begin
   inherited;
 end;
 
-function TKRTPServer.funcGetName(APack: PKRBuffer): integer;
+function TKRTPServer.funcGetName(APack: PKRBuffer2k): integer;
 var i,n: integer;
 s: AnsiString;
 begin

@@ -21,11 +21,9 @@ uses
   {$IFEND}
 
   KRIdHTTP, KRSockets, KRTypes, KRStrUtils, KRTCPServer, KRThread, KRWebCommon,
-  KRGoogleCommon, KRWebDownload,
+  KRGoogleCommon, KRWebDownload, KRJSON,
 
-  IdHTTP,
-
-  uLkJSON;
+  IdHTTP;
 
 type
   TKRGoogleAuthScopes = (gscEMail, gscContactsRead, gscContacts, gscCalendarRead,
@@ -79,7 +77,7 @@ type
     FResultPage: TStringList;
     FResultPageStr: String;
 
-    procedure srvEvent(Sender: TObject; APack: PKRBuffer; var ALength: integer);
+    procedure srvEvent(Sender: TObject; APack: PKRBuffer2k; var ALength: integer);
     function GetExpiresIn: TDateTime;
     procedure SetDataFolder(const Value: TFileName);
 
@@ -190,7 +188,7 @@ end;
 
 function TKRGoogleAuth.GetProfile: boolean;
 var
-  js: TlkJSONObject;
+  js: TKRJSONObject;
   i,n: integer;
   fname: String;
   data: TKRGoogleRESTRequestData;
@@ -200,18 +198,13 @@ begin
   FParams.Add( 'access_token', FToken );
   data.url := 'https://www.googleapis.com/oauth2/v1/userinfo' + getParams;
 
-  js := TlkJSONObject( KRRunInThread( @data, thGetProfile ) );
+  js := TKRJSONObject( KRRunInThread( @data, thGetProfile ) );
   if data.isOk then try
-    i:=js.IndexOfName('id');
-    if i>-1 then FUserID:=js.getString( i ) else FUserID:='';
-    i:=js.IndexOfName('name');
-    if i>-1 then FUserName:=js.getString( i ) else FUserName:='';
-    i:=js.IndexOfName('given_name');
-    if i>-1 then FUserGivenName:=js.getString( i ) else FUserGivenName:='';
-    i:=js.IndexOfName('family_name');
-    if i>-1 then FUserFamilyName:=js.getString( i ) else FUserFamilyName:='';
-    i:=js.IndexOfName('email');
-    if i>-1 then FUserEmail:=js.getString( i ) else FUserEmail:='';
+    if js.StringOf('id',i) then FUserID:=js.Strings[ i ].Value else FUserID:='';
+    if js.StringOf('name',i) then FUserName:=js.Strings[ i ].Value else FUserName:='';
+    if js.StringOf('given_name',i) then FUserGivenName:=js.Strings[ i ].Value else FUserGivenName:='';
+    if js.StringOf('family_name',i) then FUserFamilyName:=js.Strings[ i ].Value else FUserFamilyName:='';
+    if js.StringOf('email',i) then FUserEmail:=js.Strings[ i ].Value else FUserEmail:='';
 
     if FUserName='' then begin
       if FUserGivenName<>'' then FUserName:=FUserGivenName;
@@ -221,8 +214,7 @@ begin
     end;
 
     if Assigned(FUserIcon) then FreeAndNil(FUserIcon);
-    i:=js.IndexOfName('picture');
-    if i>-1 then FUserIcon:=GetUserIcon( js.getString( i ) );
+    if js.StringOf('picture',i) then FUserIcon:=GetUserIcon( js.Strings[ i ].Value );
 
     Result:=true;
   finally
@@ -304,10 +296,11 @@ end;
 
 function TKRGoogleAuth.Login: boolean;
 var
-  js: TlkJSONObject;
+  js: TKRJSONObject;
   i,n: integer;
   url: String;
   data: TKRGoogleRESTRequestData;
+  s: AnsiString;
 begin
   Result:=Refresh;
   if Result then exit;
@@ -361,25 +354,25 @@ begin
   end;
 
   data.url := 'https://www.googleapis.com/oauth2/v4/token';
-  data.data := 'code='+FCode+'&'+
+  s:=AnsiString( 'code='+FCode+'&'+
     'client_id='+FAppID+'&'+
     'client_secret='+FSecretKey+'&'+
     'redirect_uri='+'http://127.0.0.1:'+IntToStr(FPort)+'&'+
-    'grant_type=authorization_code';
-  js := TlkJSONObject( KRRunInThread( @data, thAuth ) );
+    'grant_type=authorization_code' );
+  data.sData := TMemoryStream.Create;
+  data.sData.Write( s[1], Length(s) );
+  js := TKRJSONObject( KRRunInThread( @data, thAuth ) );
+  data.sData.Free;
   if not data.isOk then begin
     if Assigned(FOnError) then FOnError(Self);
     exit;
   end;
   try
-    i:=js.IndexOfName('access_token');
-    if i>-1 then begin
-      FToken:=js.getString(i);
-      i:=js.IndexOfName('expires_in');
-      if i>-1 then n:=js.getInt(i) else n:=3600;
+    if js.StringOf('access_token',i) then begin
+      FToken:=js.Strings[ i ].Value;
+      if js.IntegerOf('expires_in',i) then n:=js.Integers[ i ].Value else n:=3600;
       FExpiresIn:=now+n*1.157407407407407e-5;
-      i:=js.IndexOfName('refresh_token');
-      if i>-1 then SetRefreshToken( js.getString( i ) );
+      if js.StringOf('refresh_token',i) then SetRefreshToken( js.Strings[ i ].Value );
     end else begin
       if Assigned(FOnError) then FOnError(Self);
       exit
@@ -423,27 +416,27 @@ end;
 
 function TKRGoogleAuth.RefreshToken: boolean;
 var
-  js: TlkJSONObject;
+  js: TKRJSONObject;
   i, n: integer;
   data: TKRGoogleRESTRequestData;
+  s: AnsiString;
 begin
   Result := false;
   data.url := 'https://www.googleapis.com/oauth2/v4/token';
-  data.data := 'refresh_token='+FRefreshToken+'&'+
+  s := AnsiString('refresh_token='+FRefreshToken+'&'+
     'client_id='+FAppID+'&'+
     'client_secret='+FSecretKey+'&'+
-    'grant_type=refresh_token';
-
-  js := TlkJSONObject( KRRunInThread( @data, thRefreshToken ) );
-  if Assigned(js) then try
-    i:=js.IndexOfName('access_token');
-    if i>-1 then begin
-      FToken:=js.getString(i);
-      i:=js.IndexOfName('expires_in');
-      if i>-1 then n:=js.getInt(i) else n:=3600;
+    'grant_type=refresh_token');
+  data.sData := TMemoryStream.Create;
+  data.sData.Write( s[1], Length(s) );
+  js := TKRJSONObject( KRRunInThread( @data, thRefreshToken ) );
+  data.sData.Free;
+  if data.isOk then try
+    if js.StringOf('access_token',i) then begin
+      FToken:=js.Strings[ i ].Value;
+      if js.IntegerOf('expires_in',i) then n:=js.Integers[i].Value else n:=3600;
       FExpiresIn:=now+n*1.157407407407407e-5;
-      i:=js.IndexOfName('refresh_token');
-      if i>-1 then SetRefreshToken( js.getString( i ) );
+      if js.StringOf('refresh_token',i) then SetRefreshToken( js.Strings[ i ].Value );
       Result:=true;
     end;
   finally
@@ -473,7 +466,7 @@ begin
   FResultPage.Assign( Value );
 end;
 
-procedure TKRGoogleAuth.srvEvent(Sender: TObject; APack: PKRBuffer;
+procedure TKRGoogleAuth.srvEvent(Sender: TObject; APack: PKRBuffer2k;
   var ALength: integer);
 var
   s: String;
@@ -522,7 +515,7 @@ end;
 function TKRGoogleAuth.thAuth(AThread: TThread; AData: Pointer): Pointer;
 var
   http: TKRIdHTTP;
-  Response: TStringStream;
+  Response: TMemoryStream;
   data: PKRGoogleRESTRequestData;
 begin
   Result := nil;
@@ -531,9 +524,13 @@ begin
 
   Response:=POST( Http, Data, 'application/x-www-form-urlencoded' );
 
-  if Data.isOk then begin
-    Result := Pointer(TlkJSON.ParseText(Response.DataString));
+  if data.isOk then begin
+    Result := Pointer(TKRJSON.Parse(Response.Memory,Response.Size));
     data.isOk := Result <> nil;
+    if data.isOk and ( TKRJSON(Result).ValueType<>jstObject ) then begin
+      TKRJSON(Result).Free;
+      data.isOk:=false;
+    end;
   end;
 
   HTTPDestroy( http );
@@ -543,7 +540,7 @@ end;
 function TKRGoogleAuth.thGetProfile(AThread: TThread; AData: Pointer): Pointer;
 var
   http: TKRIdHTTP;
-  Response: TStringStream;
+  Response: TMemoryStream;
   data: PKRGoogleRESTRequestData;
 begin
   result := nil;
@@ -552,8 +549,12 @@ begin
   Response := GET( http, data );
 
   if data.isOk then begin
-    Result := Pointer(TlkJSON.ParseText(Response.DataString));
+    Result := Pointer(TKRJSON.Parse(Response.Memory,Response.Size));
     data.isOk := Result <> nil;
+    if data.isOk and ( TKRJSON(Result).ValueType<>jstObject ) then begin
+      TKRJSON(Result).Free;
+      data.isOk:=false;
+    end;
   end;
 
   HTTPDestroy( http );
@@ -580,22 +581,20 @@ end;
 function TKRGoogleAuth.thLogout(AThread: TThread; AData: Pointer): Pointer;
 var
   http: TKRIdHTTP;
-  Response: TStringStream;
   data: PKRGoogleRESTRequestData;
 begin
   Result := nil;
   data := AData;
   Http := HTTPCreate;
-  Response := GET( Http, data );
+  GET( Http, data ).Free;
   HTTPDestroy( Http );
-  Response.Free;
 end;
 
 function TKRGoogleAuth.thRefreshToken(AThread: TThread;
   AData: Pointer): Pointer;
 var
   http: TKRIdHTTP;
-  Response: TStringStream;
+  Response: TMemoryStream;
   data: PKRGoogleRESTRequestData;
 begin
   Result:=nil;
@@ -604,8 +603,12 @@ begin
   Response := POST( Http, data, 'application/x-www-form-urlencoded' );
 
   if data.isOk then begin
-    Result := Pointer(TlkJSON.ParseText(Response.DataString));
+    Result := Pointer(TKRJSON.Parse(Response.Memory,Response.Size));
     data.isOk := Result <> nil;
+    if data.isOk and ( TKRJSON(Result).ValueType<>jstObject ) then begin
+      TKRJSON(Result).Free;
+      data.isOk:=false;
+    end;
   end;
 
   HTTPDestroy( http );
@@ -662,3 +665,4 @@ begin
 end;
 
 end.
+

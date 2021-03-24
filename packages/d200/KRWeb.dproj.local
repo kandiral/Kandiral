@@ -1,24 +1,24 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <BorlandProject>
 	<Transactions>
-    <Transaction>1899.12.30 00:00:00.000.198,X:\Components\Kandiral\packages\d200\KRWeb.dproj=C:\Users\kandiral\Documents\Embarcadero\Studio\Projects\Package1.dproj</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.846,=X:\Components\Kandiral\packages\d200\KRWebRegister.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.483,=KRCommon.dcp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.154,=designide.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.904,=X:\Components\Kandiral\Web\KRWebDownload.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.481,=inet.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.846,=X:\Components\Kandiral\packages\d200\KRWebRegister.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.228,=rtl.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.877,=X:\Components\Kandiral\Web\KRIdHTTP.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.734,=X:\Components\Kandiral\Web\KRGoogleAPI.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.979,=X:\Components\Kandiral\Web\KRGoogleContacts.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.171,=X:\Components\Kandiral\Web\KRGoogleSearchConsole.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.481,=inet.dcp</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.228,=rtl.dcp</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.947,=X:\Components\Kandiral\Web\KRGoogleAuth.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.225,=KRAutomation.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.483,=KRCommon.dcp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.003,=X:\Components\Kandiral\Web\KRGoogleSheets.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.864,=X:\Components\Kandiral\Web\KRGoogleTranslate.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.890,=X:\Components\Kandiral\Web\KRWebCommon.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.225,=KRAutomation.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.947,=X:\Components\Kandiral\Web\KRGoogleAuth.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.198,C:\Users\kandiral\Documents\Embarcadero\Studio\Projects\Package1.dproj=X:\Components\Kandiral\packages\d200\KRWeb.dproj</Transaction>
     <Transaction>1899.12.30 00:00:00.000.506,=vclie.dcp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.447,=vclimg.dcp</Transaction>
-    <Transaction>2021.03.14 18:03:30.734,=X:\Components\Kandiral\Web\KRGoogleAPI.pas</Transaction>
-    <Transaction>2021.03.14 18:03:30.774,=X:\Components\Kandiral\Web\KRGoogleCommon.pas</Transaction>
-    <Transaction>2021.03.14 18:03:30.864,=X:\Components\Kandiral\Web\KRGoogleTranslate.pas</Transaction>
-    <Transaction>2021.03.14 18:03:30.877,=X:\Components\Kandiral\Web\KRIdHTTP.pas</Transaction>
-    <Transaction>2021.03.14 18:03:30.890,=X:\Components\Kandiral\Web\KRWebCommon.pas</Transaction>
-    <Transaction>2021.03.14 18:03:30.904,=X:\Components\Kandiral\Web\KRWebDownload.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.774,=X:\Components\Kandiral\Web\KRGoogleCommon.pas</Transaction>
   </Transactions>
 </BorlandProject>

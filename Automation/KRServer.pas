@@ -21,8 +21,8 @@ uses
   KRTypes, KRRuntimeErrors, KRThread, KRSockets;
 
 type
-  TKRServerEvent = procedure(Sender: TObject; APack: PKRBuffer; var ALength: integer) of Object;
-  TKRServerPackEv = procedure(Sender: TObject; APack: PKRBuffer; ALength: integer) of Object;
+  TKRServerEvent = procedure(Sender: TObject; APack: PKRBuffer2k; var ALength: integer) of Object;
+  TKRServerPackEv = procedure(Sender: TObject; APack: PKRBuffer2k; ALength: integer) of Object;
 
   TKRServer = class;
   TKRServerThread = class;
@@ -32,10 +32,10 @@ type
     FServerThread: TKRServerThread;
     FClient: TKRSocketSrvClient;
     FLastDataTime, FTimeout: Cardinal;
-    FPack: PKRBuffer;
+    FPack: PKRBuffer2k;
     FLength: Integer;
-    procedure SendPack(APack: PKRBuffer; ALength: integer);
-    procedure RecvPack(APack: PKRBuffer; ALength: integer);
+    procedure SendPack(APack: PKRBuffer2k; ALength: integer);
+    procedure RecvPack(APack: PKRBuffer2k; ALength: integer);
     procedure SendPackAsync;
     procedure RecvPackAsync;
   protected
@@ -344,10 +344,10 @@ end;
 
 procedure TKRSrvClient.KRExecute;
 var
-  buf: TKRBuffer;
+  buf: TKRBuffer2k;
   n: integer;
 begin
-  n:=FClient.ReceiveBuf(buf,1024);
+  n:=FClient.ReceiveBuf( buf, SizeOf( TKRBuffer2k ) );
   if n>0 then begin
     RecvPack(@buf,n);
     FServerThread.FEvent(FClient,@buf,n);
@@ -374,7 +374,7 @@ begin
 //REAddLog('TKRSrvClient.KRExecutePausedFirst END');
 end;
 
-procedure TKRSrvClient.RecvPack(APack: PKRBuffer; ALength: integer);
+procedure TKRSrvClient.RecvPack(APack: PKRBuffer2k; ALength: integer);
 begin
   if Assigned(FServerThread.FMainServer.FOnRecv) then
     FServerThread.FMainServer.FOnRecv(FClient,APack,ALength);
@@ -391,7 +391,7 @@ begin
     FServerThread.FMainServer.FOnRecvAsync(FClient,FPack,FLength);
 end;
 
-procedure TKRSrvClient.SendPack(APack: PKRBuffer; ALength: integer);
+procedure TKRSrvClient.SendPack(APack: PKRBuffer2k; ALength: integer);
 begin
   if Assigned(FServerThread.FMainServer.FOnSend) then
     FServerThread.FMainServer.FOnSend(FClient,APack,ALength);

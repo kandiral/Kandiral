@@ -21,16 +21,16 @@ uses
     KRTypes;
 
 
-  function KRCRC16(ABuffer: PKRBuffer;ALength: integer):Word;overload;
-  procedure KRCRC16(ABuffer: PKRBuffer;ALength: integer;var crc_low:byte; var crc_high:byte);overload;
+  function KRCRC16( ABuffer: PByte; ALength: integer ): Word; overload;
+  procedure KRCRC16( ABuffer: PByte; ALength: integer; var crc_low: byte; var crc_high: byte ); overload;
 
-  function KRCRC32File(const FileName: string): Cardinal;
-  function KRCRC32Up(InitCRC: Cardinal; BufPtr: Pointer; Len: Word): LongInt;
+  function KRCRC32File( const FileName: string ): Cardinal;
+  function KRCRC32Up( InitCRC: Cardinal; BufPtr: Pointer; Len: Word ): LongInt;
 
 implementation
 
 const
-  crc16_table : array[0..511] of byte = (
+  crc16_table : array[ 0..511 ] of byte = (
     $0 , $C1, $81, $40, $1 , $C0, $80, $41, $1 , $C0, $80, $41, $0 , $C1, $81, $40,
     $1 , $C0, $80, $41, $0 , $C1, $81, $40, $0 , $C1, $81, $40, $1 , $C0, $80, $41,
     $1 , $C0, $80, $41, $0 , $C1, $81, $40, $0 , $C1, $81, $40, $1 , $C0, $80, $41,
@@ -64,7 +64,7 @@ const
     $88, $48, $49, $89, $4B, $8B, $8A, $4A, $4E, $8E, $8F, $4F, $8D, $4D, $4C, $8C,
     $44, $84, $85, $45, $87, $47, $46, $86, $82, $42, $43, $83, $41, $81, $80, $40);
 
-  crc32_table : array[0..255] of Cardinal = (
+  crc32_table : array[ 0..255 ] of Cardinal = (
     $00000000, $77073096, $EE0E612C, $990951BA, $076DC419, $706AF48F, $E963A535, $9E6495A3,
     $0EDB8832, $79DCB8A4, $E0D5E91E, $97D2D988, $09B64C2B, $7EB17CBD, $E7B82D07, $90BF1D91,
     $1DB71064, $6AB020F2, $F3B97148, $84BE41DE, $1ADAD47D, $6DDDE4EB, $F4D4B551, $83D385C7,
@@ -103,7 +103,7 @@ const
 var
   Buf: array[1..BufLen] of Byte;
 
-function KRCRC16(ABuffer: PKRBuffer;ALength: integer):Word;
+function KRCRC16( ABuffer: PByte; ALength: integer ): Word;
 var
   crc_High, crc_Low: byte;
 begin
@@ -111,16 +111,17 @@ begin
   Result:=crc_High*256+crc_Low;
 end;
 
-procedure KRCRC16(ABuffer: PKRBuffer;ALength: integer;var crc_low:byte; var crc_high:byte);
+procedure KRCRC16( ABuffer: PByte; ALength: integer; var crc_low: byte; var crc_high: byte );
 var
   i,index: integer;
 begin
   crc_Low := $FF;
   crc_High := $FF;
   for i:=0 to ALength-1 do begin
-    index := crc_High xor ABuffer^[i];
+    index := crc_High xor ABuffer^;
     crc_High := crc_Low xor crc16_table[index] ;
     crc_Low := crc16_table[index + 256];
+    inc( ABuffer );
   end;
 end;
 

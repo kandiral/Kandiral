@@ -1,29 +1,29 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <BorlandProject>
 	<Transactions>
-    <Transaction>1899.12.30 00:00:00.000.386,=rtl.dcp</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.169,=X:\Components\Kandiral\packages\d150\Unit1.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.164,=X:\Components\Kandiral\packages\d150\Unit1.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.518,=KRCommon.dcp</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.481,=X:\Components\Kandiral\Web\KRWebDownload.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.365,X:\Components\Kandiral\packages\d150\Unit1.pas=X:\Components\Kandiral\Web\KRGoogleSearchConsole.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.785,X:\Components\Kandiral\packages\d150\Unit1.pas=X:\Components\Kandiral\packages\d150\KRWebRegister.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.386,=rtl.dcp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.777,=rtl.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.169,=X:\Components\Kandiral\packages\d150\Unit1.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.895,=X:\Components\Kandiral\Web\KRWebBrowser.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.501,X:\Components\Kandiral\Web\KRWebBrowser.pas=</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.195,=X:\Components\Kandiral\Web\KRGoogleAPI.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.454,=X:\Components\Kandiral\Web\KRWebCommon.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.483,C:\Users\kandiral\Documents\RAD Studio\Projects\Package1.dproj=X:\Components\Kandiral\packages\d150\KRWeb.dproj</Transaction>
     <Transaction>1899.12.30 00:00:00.000.512,=X:\Components\Kandiral\Web\KRGoogleContacts.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.365,X:\Components\Kandiral\Web\KRGoogleSearchConsole.pas=X:\Components\Kandiral\packages\d150\Unit1.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.427,=X:\Components\Kandiral\Web\KRIdHTTP.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.385,=KRAutomation.dcp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.401,=X:\Components\Kandiral\Web\KRGoogleTranslate.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.406,=X:\Components\Kandiral\Web\KRGoogleAuth.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.454,=X:\Components\Kandiral\Web\KRWebCommon.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.785,X:\Components\Kandiral\packages\d150\KRWebRegister.pas=X:\Components\Kandiral\packages\d150\Unit1.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.483,X:\Components\Kandiral\packages\d150\KRWeb.dproj=C:\Users\kandiral\Documents\RAD Studio\Projects\Package1.dproj</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.203,=vclie.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.316,=vclimg.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.195,=X:\Components\Kandiral\Web\KRGoogleAPI.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.385,=KRAutomation.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.547,=X:\Components\Kandiral\Web\KRGoogleSheets.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.075,=designide.dcp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.362,=inet.dcp</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.316,=vclimg.dcp</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.547,=X:\Components\Kandiral\Web\KRGoogleSheets.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.481,=X:\Components\Kandiral\Web\KRWebDownload.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.276,=X:\Components\Kandiral\Web\KRGoogleCommon.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.203,=vclie.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.518,=KRCommon.dcp</Transaction>
   </Transactions>
 </BorlandProject>

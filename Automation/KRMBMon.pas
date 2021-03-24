@@ -43,8 +43,8 @@ type
     KRBLValueEdit1: TKRBLValueEdit;
     KRBLValueEdit2: TKRBLValueEdit;
     filtring: boolean;
-    procedure send(Sender: TObject; APack: PKRBuffer; ALength: integer);
-    procedure recv(Sender: TObject; APack: PKRBuffer; ALength: integer);
+    procedure send(Sender: TObject; APack: PByte; ALength: integer);
+    procedure recv(Sender: TObject; APack: PByte; ALength: integer);
   protected
     procedure CreateParams(var Params: TCreateParams);override;
     procedure DoHide; override;
@@ -178,7 +178,7 @@ begin
   end;
 end;
 
-procedure TKRMBMonForm.recv(Sender: TObject; APack: PKRBuffer; ALength: integer);
+procedure TKRMBMonForm.recv(Sender: TObject; APack: PByte; ALength: integer);
 var
   pch: PAnsiChar;
   txt: boolean;
@@ -200,7 +200,7 @@ begin
   else AddLog('RECV: '+sourceToHex(pch,ALength));
 end;
 
-procedure TKRMBMonForm.send(Sender: TObject; APack: PKRBuffer; ALength: integer);
+procedure TKRMBMonForm.send(Sender: TObject; APack: PByte; ALength: integer);
 var
   pch: PAnsiChar;
   txt: boolean;

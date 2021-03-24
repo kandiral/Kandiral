@@ -1,14 +1,14 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <BorlandProject>
 	<Transactions>
-    <Transaction>1899.12.30 00:00:00.000.746,X:\Components\Kandiral\packages\d180\KRFile.dproj=C:\Users\kandiral\Documents\RAD Studio\Projects\Package1.dproj</Transaction>
     <Transaction>1899.12.30 00:00:00.000.876,=X:\Components\Kandiral\File\KRFileList.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.839,=X:\Components\Kandiral\File\KRDriveComboBox.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.159,=KRCommon.dcp</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.523,=X:\Components\Kandiral\packages\d180\KRFileRegister.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.905,=X:\Components\Kandiral\File\KROpenFolderDlg.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.839,=X:\Components\Kandiral\File\KRDriveComboBox.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.170,=designide.dcp</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.777,=rtl.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.746,C:\Users\kandiral\Documents\RAD Studio\Projects\Package1.dproj=X:\Components\Kandiral\packages\d180\KRFile.dproj</Transaction>
     <Transaction>1899.12.30 00:00:00.000.517,=rtl.dcp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.905,=X:\Components\Kandiral\File\KROpenFolderDlg.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.523,=X:\Components\Kandiral\packages\d180\KRFileRegister.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.777,=rtl.dcp</Transaction>
   </Transactions>
 </BorlandProject>

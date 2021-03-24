@@ -72,7 +72,6 @@ contains
   lgop in '..\..\Utils\lgop.pas',
   KRUDPSocketServer in '..\..\Net\KRUDPSocketServer.pas',
   KRBLEdit in '..\..\Common\KRBLEdit.pas',
-  uLkJSON in '..\..\Utils\uLkJSON.pas',
   KRThreadEvent in '..\..\Common\KRThreadEvent.pas',
   KRThreadQueueEvent in '..\..\Common\KRThreadQueueEvent.pas',
   KRValueEditLng in '..\..\Common\KRValueEditLng.pas',
@@ -86,6 +85,7 @@ contains
   KRMsgBox in '..\..\Utils\KRMsgBox.pas',
   KRUtils in '..\..\Utils\KRUtils.pas',
   KRVariants in '..\..\Utils\KRVariants.pas',
-  KRKernel32 in '..\..\Windows\KRKernel32.pas';
+  KRKernel32 in '..\..\Windows\KRKernel32.pas',
+  KRJSON in '..\..\Utils\KRJSON.pas';
 
 end.

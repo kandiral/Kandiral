@@ -80,10 +80,10 @@ contains
   funcs in '..\..\Utils\funcs.pas',
   KRUtils in '..\..\Utils\KRUtils.pas',
   lgop in '..\..\Utils\lgop.pas',
-  uLkJSON in '..\..\Utils\uLkJSON.pas',
   KRBase64 in '..\..\Crypting\KRBase64.pas',
   ISO3166 in '..\..\ISO\ISO3166.pas',
-  KRKernel32 in '..\..\Windows\KRKernel32.pas';
+  KRKernel32 in '..\..\Windows\KRKernel32.pas',
+  KRJSON in '..\..\Utils\KRJSON.pas';
 
 end.
 

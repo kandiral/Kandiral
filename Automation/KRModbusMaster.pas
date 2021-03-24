@@ -164,7 +164,7 @@ type
     procedure DoRuntimeError(ADesc: String; E: Exception);
   protected
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
-    procedure ConnectorCB(AError: integer; APack: PKRBuffer; ALength: integer; AData: Pointer);
+    procedure ConnectorCB(AError: integer; APack: PByte; ALength: integer; AData: Pointer);
 
     function chTCPReadCoils(APack: PKRBuffer; ALength: byte; var ABytes: TKRBytes): integer;
     function chTCPReadDiscretInputs(APack: PKRBuffer; ALength: byte; var ABytes: TKRBytes): integer;
@@ -452,7 +452,7 @@ function MBMRTUReadCoils(ADevAddr: byte; AStartCoil, ACount: Word;
     ABuffer: PKRBuffer; out ARecvLen: Byte): Byte;
 begin
   Result:=MBMReadCoils(ADevAddr,AStartCoil,ACount,0,ABuffer,ARecvLen);
-  KRCRC16(ABuffer,Result,ABuffer^[Result+1],ABuffer^[Result]);
+  KRCRC16( PByte( ABuffer ), Result, ABuffer^[ Result + 1 ], ABuffer^[ Result ] );
   Result:=Result+2;
   ARecvLen:=ARecvLen+2;
 end;
@@ -461,7 +461,7 @@ function MBMRTUReadDiscretInputs(ADevAddr: byte; AStartInput, ACount: Word;
     ABuffer: PKRBuffer; out ARecvLen: Byte): Byte;
 begin
   Result:=MBMReadDiscretInputs(ADevAddr,AStartInput,ACount,0,ABuffer,ARecvLen);
-  KRCRC16(ABuffer,Result,ABuffer^[Result+1],ABuffer^[Result]);
+  KRCRC16( PByte( ABuffer ), Result, ABuffer^[ Result + 1 ], ABuffer^[ Result ] );
   Result:=Result+2;
   ARecvLen:=ARecvLen+2;
 end;
@@ -470,7 +470,7 @@ function MBMRTUReadHoldingRegisters(ADevAddr: byte; AStartReg, ACount: Word;
     ABuffer: PKRBuffer; out ARecvLen: Byte): Byte;
 begin
   Result:=MBMReadHoldingRegisters(ADevAddr,AStartReg,ACount,0,ABuffer,ARecvLen);
-  KRCRC16(ABuffer,Result,ABuffer^[Result+1],ABuffer^[Result]);
+  KRCRC16( PByte( ABuffer ), Result, ABuffer^[ Result + 1 ], ABuffer^[ Result ] );
   Result:=Result+2;
   ARecvLen:=ARecvLen+2;
 end;
@@ -479,7 +479,7 @@ function MBMRTUReadInputRegisters(ADevAddr: byte; AStartReg, ACount: Word;
     ABuffer: PKRBuffer; out ARecvLen: Byte): Byte;
 begin
   Result:=MBMReadInputRegisters(ADevAddr,AStartReg,ACount,0,ABuffer,ARecvLen);
-  KRCRC16(ABuffer,Result,ABuffer^[Result+1],ABuffer^[Result]);
+  KRCRC16( PByte( ABuffer ), Result, ABuffer^[ Result + 1 ], ABuffer^[ Result ] );
   Result:=Result+2;
   ARecvLen:=ARecvLen+2;
 end;
@@ -488,7 +488,7 @@ function MBMRTUReadStatus(ADevAddr: byte; ABuffer: PKRBuffer;
     out ARecvLen: Byte): Byte;
 begin
   Result:=MBMReadStatus(ADevAddr,0,ABuffer,ARecvLen);
-  KRCRC16(ABuffer,Result,ABuffer^[Result+1],ABuffer^[Result]);
+  KRCRC16( PByte( ABuffer ), Result, ABuffer^[ Result + 1 ], ABuffer^[ Result ] );
   Result:=Result+2;
   ARecvLen:=ARecvLen+2;
 end;
@@ -497,7 +497,7 @@ function MBMRTUUserFunction(ADevAddr: byte; AFunc: byte; AData: PKRBuffer;
     ADataLen: integer; ABuffer: PKRBuffer): Byte;
 begin
   Result:=MBMUserFunction(ADevAddr,AFunc,AData,ADataLen,0,ABuffer);
-  KRCRC16(ABuffer,Result,ABuffer^[Result+1],ABuffer^[Result]);
+  KRCRC16( PByte( ABuffer ), Result, ABuffer^[ Result + 1 ], ABuffer^[ Result ] );
   Result:=Result+2;
 end;
 
@@ -505,7 +505,7 @@ function MBMRTUWriteCoil(ADevAddr: byte; ACoilNum: Word;
     AData: boolean; ABuffer: PKRBuffer; out ARecvLen: Byte): Byte;
 begin
   Result:=MBMWriteCoil(ADevAddr,ACoilNum,AData,0,ABuffer,ARecvLen);
-  KRCRC16(ABuffer,Result,ABuffer^[Result+1],ABuffer^[Result]);
+  KRCRC16( PByte( ABuffer ), Result, ABuffer^[ Result + 1 ], ABuffer^[ Result ] );
   Result:=Result+2;
   ARecvLen:=ARecvLen+2;
 end;
@@ -514,7 +514,7 @@ function MBMRTUWriteCoils(ADevAddr: byte; AStartCoil, ACount: Word;
     AData: TKRBytes; ABuffer: PKRBuffer; out ARecvLen: Byte): Byte;
 begin
   Result:=MBMWriteCoils(ADevAddr,AStartCoil,ACount,AData,0,ABuffer,ARecvLen);
-  KRCRC16(ABuffer,Result,ABuffer^[Result+1],ABuffer^[Result]);
+  KRCRC16( PByte( ABuffer ), Result, ABuffer^[ Result + 1 ], ABuffer^[ Result ] );
   Result:=Result+2;
   ARecvLen:=ARecvLen+2;
 end;
@@ -523,7 +523,7 @@ function MBMRTUWriteHoldingRegister(ADevAddr: byte; AStartReg: Word;
     AData: Word; ABuffer: PKRBuffer; out ARecvLen: Byte): Byte;
 begin
   Result:=MBMWriteHoldingRegister(ADevAddr,AStartReg,AData,0,ABuffer,ARecvLen);
-  KRCRC16(ABuffer,Result,ABuffer^[Result+1],ABuffer^[Result]);
+  KRCRC16( PByte( ABuffer ), Result, ABuffer^[ Result + 1 ], ABuffer^[ Result ] );
   Result:=Result+2;
   ARecvLen:=ARecvLen+2;
 end;
@@ -532,7 +532,7 @@ function MBMRTUWriteHoldingRegisters(ADevAddr: byte; AStartReg: Word;
     AData: TKRRegisters; ABuffer: PKRBuffer; out ARecvLen: Byte): Byte;
 begin
   Result:=MBMWriteHoldingRegisters(ADevAddr,AStartReg,AData,0,ABuffer,ARecvLen);
-  KRCRC16(ABuffer,Result,ABuffer^[Result+1],ABuffer^[Result]);
+  KRCRC16( PByte( ABuffer ), Result, ABuffer^[ Result + 1 ], ABuffer^[ Result ] );
   Result:=Result+2;
   ARecvLen:=ARecvLen+2;
 end;
@@ -1239,13 +1239,14 @@ begin
   Result:=0;
 end;
 
-procedure TKRModbusMaster.ConnectorCB(AError: integer; APack: PKRBuffer;
+procedure TKRModbusMaster.ConnectorCB(AError: integer; APack: PByte;
   ALength: integer; AData: Pointer);
 var
   _Data: PMBPack;
   _Regs: TKRRegisters;
   _err: integer;
   _DataBt: TKRBytes;
+  buf: PKRBuffer;
   bt: byte;
   p: pointer;
 begin
@@ -1254,42 +1255,43 @@ begin
     if FThread=nil then exit;
 
     _Data:=AData;
+    buf:=PKRBuffer( APack );
     try
       if not Assigned(_Data^.CallBack) then exit;
       p:=nil;
       if AError<>0 then _err:=AError*-1-100 else begin
         case _Data^.MBType of
           mbtTCP: begin
-            if FCheckID and(_Data^.id<>APack^[0]) then _err:=-mbmeIncorrectID else begin
-              if APack^[7] AND $7F <> _Data^.MBFunc then _err:=-mbmeIncorrectFunction else begin
-                if GetBit(APack^[7],7) then _err:=APack^[8] else begin
+            if FCheckID and(_Data^.id<>buf^[0]) then _err:=-mbmeIncorrectID else begin
+              if buf^[7] AND $7F <> _Data^.MBFunc then _err:=-mbmeIncorrectFunction else begin
+                if GetBit(buf^[7],7) then _err:=buf^[8] else begin
                   case _Data^.MBFunc of
                     mbfReadCoils: begin
-                      _err:=chTCPReadCoils(APack, ALength, _DataBt);
+                      _err:=chTCPReadCoils(buf, ALength, _DataBt);
                       p:=@_DataBt;
                     end;
                     mbfReadDiscretInputs: begin
-                      _err:=chTCPReadDiscretInputs(APack, ALength, _DataBt);
+                      _err:=chTCPReadDiscretInputs(buf, ALength, _DataBt);
                       p:=@_DataBt;
                     end;
                     mbfReadHoldingRegisters: begin
-                      _err:=chTCPReadHoldingRegisters(APack, ALength, _Regs);
+                      _err:=chTCPReadHoldingRegisters(buf, ALength, _Regs);
                       p:=@_Regs;
                     end;
                     mbfReadInputRegisters: begin
-                      _err:=chTCPReadInputRegisters(APack, ALength, _Regs);
+                      _err:=chTCPReadInputRegisters(buf, ALength, _Regs);
                       p:=@_Regs;
                     end;
                     mbfReadStatus: begin
-                      _err:=chTCPReadStatus(APack, ALength, bt);
+                      _err:=chTCPReadStatus(buf, ALength, bt);
                       p:=@bt;
                     end;
-                    mbfWriteCoil: _err:=chTCPWriteCoil(APack, ALength);
-                    mbfWriteCoils: _err:=chTCPWriteCoils(APack, ALength);
-                    mbfWriteHoldingRegister: _err:=chTCPWriteHoldingRegister(APack, ALength);
-                    mbfWriteHoldingRegisters: _err:=chTCPWriteHoldingRegisters(APack, ALength)
+                    mbfWriteCoil: _err:=chTCPWriteCoil(buf, ALength);
+                    mbfWriteCoils: _err:=chTCPWriteCoils(buf, ALength);
+                    mbfWriteHoldingRegister: _err:=chTCPWriteHoldingRegister(buf, ALength);
+                    mbfWriteHoldingRegisters: _err:=chTCPWriteHoldingRegisters(buf, ALength)
                     else begin
-                      _err:=chTCPUserFunction(APack, ALength, _DataBt);
+                      _err:=chTCPUserFunction(buf, ALength, _DataBt);
                       p:=@_DataBt;
                     end;
                   end;
@@ -1298,36 +1300,36 @@ begin
             end;
           end;
           mbtRTU: begin
-            if KRCRC16(APack,ALength-2)<>BytesToWord(APack^[ALength-1],APack^[ALength-2]) then _err:=-mbmeCRC else begin
-              if APack^[1] AND $7F <> _Data^.MBFunc then _err:=-mbmeIncorrectFunction else begin
-                if GetBit(APack^[1],7) then _err:=APack^[2] else begin
+            if KRCRC16( APack, ALength - 2 ) <> BytesToWord( buf^[ALength-1] , buf^[ALength-2] ) then _err:=-mbmeCRC else begin
+              if buf^[1] AND $7F <> _Data^.MBFunc then _err:=-mbmeIncorrectFunction else begin
+                if GetBit(buf^[1],7) then _err:=buf^[2] else begin
                   case _Data^.MBFunc of
                     mbfReadCoils: begin
-                      _err:=chRTUReadCoils(APack, ALength, _DataBt);
+                      _err:=chRTUReadCoils(buf, ALength, _DataBt);
                       p:=@_DataBt;
                     end;
                     mbfReadDiscretInputs: begin
-                      _err:=chRTUReadDiscretInputs(APack, ALength, _DataBt);
+                      _err:=chRTUReadDiscretInputs(buf, ALength, _DataBt);
                       p:=@_DataBt;
                     end;
                     mbfReadHoldingRegisters: begin
-                      _err:=chRTUReadHoldingRegisters(APack, ALength, _Regs);
+                      _err:=chRTUReadHoldingRegisters(buf, ALength, _Regs);
                       p:=@_Regs;
                     end;
                     mbfReadInputRegisters: begin
-                      _err:=chRTUReadInputRegisters(APack, ALength, _Regs);
+                      _err:=chRTUReadInputRegisters(buf, ALength, _Regs);
                       p:=@_Regs;
                     end;
                     mbfReadStatus: begin
-                      _err:=chRTUReadStatus(APack, ALength, bt);
+                      _err:=chRTUReadStatus(buf, ALength, bt);
                       p:=@bt;
                     end;
-                    mbfWriteCoil: _err:=chRTUWriteCoil(APack, ALength);
-                    mbfWriteCoils: _err:=chRTUWriteCoils(APack, ALength);
-                    mbfWriteHoldingRegister: _err:=chRTUWriteHoldingRegister(APack, ALength);
-                    mbfWriteHoldingRegisters: _err:=chRTUWriteHoldingRegisters(APack, ALength)
+                    mbfWriteCoil: _err:=chRTUWriteCoil(buf, ALength);
+                    mbfWriteCoils: _err:=chRTUWriteCoils(buf, ALength);
+                    mbfWriteHoldingRegister: _err:=chRTUWriteHoldingRegister(buf, ALength);
+                    mbfWriteHoldingRegisters: _err:=chRTUWriteHoldingRegisters(buf, ALength)
                     else begin
-                      _err:=chRTUUserFunction(APack, ALength, _DataBt);
+                      _err:=chRTUUserFunction(buf, ALength, _DataBt);
                       p:=@_DataBt;
                     end;
                   end;
@@ -1335,37 +1337,37 @@ begin
               end;
             end;
           end else begin // mbtASCII
-            if MBLRC(APack,ALength)<>MBHexToValue(APack^[ALength-4],APack^[ALength-3])then _err:=-mbmeCRC else begin
-              bt:=MBHexToValue(APack^[3],APack^[4]);
+            if MBLRC(buf,ALength)<>MBHexToValue(buf^[ALength-4],buf^[ALength-3])then _err:=-mbmeCRC else begin
+              bt:=MBHexToValue(buf^[3],buf^[4]);
               if bt AND $7F <> _Data^.MBFunc then _err:=-mbmeIncorrectFunction else begin
-                if GetBit(bt,7) then _err:=MBHexToValue(APack^[5],APack^[6]) else begin
+                if GetBit(bt,7) then _err:=MBHexToValue(buf^[5],buf^[6]) else begin
                   case _Data^.MBFunc of
                     mbfReadCoils: begin
-                      _err:=chASCIIReadCoils(APack, ALength, _DataBt);
+                      _err:=chASCIIReadCoils(buf, ALength, _DataBt);
                       p:=@_DataBt;
                     end;
                     mbfReadDiscretInputs: begin
-                      _err:=chASCIIReadDiscretInputs(APack, ALength, _DataBt);
+                      _err:=chASCIIReadDiscretInputs(buf, ALength, _DataBt);
                       p:=@_DataBt;
                     end;
                     mbfReadHoldingRegisters: begin
-                      _err:=chASCIIReadHoldingRegisters(APack, ALength, _Regs);
+                      _err:=chASCIIReadHoldingRegisters(buf, ALength, _Regs);
                       p:=@_Regs;
                     end;
                     mbfReadInputRegisters: begin
-                      _err:=chASCIIReadInputRegisters(APack, ALength, _Regs);
+                      _err:=chASCIIReadInputRegisters(buf, ALength, _Regs);
                       p:=@_Regs;
                     end;
                     mbfReadStatus: begin
-                      _err:=chASCIIReadStatus(APack, ALength, bt);
+                      _err:=chASCIIReadStatus(buf, ALength, bt);
                       p:=@bt;
                     end;
-                    mbfWriteCoil: _err:=chASCIIWriteCoil(APack, ALength);
-                    mbfWriteCoils: _err:=chASCIIWriteCoils(APack, ALength);
-                    mbfWriteHoldingRegister: _err:=chASCIIWriteHoldingRegister(APack, ALength);
-                    mbfWriteHoldingRegisters: _err:=chASCIIWriteHoldingRegisters(APack, ALength)
+                    mbfWriteCoil: _err:=chASCIIWriteCoil(buf, ALength);
+                    mbfWriteCoils: _err:=chASCIIWriteCoils(buf, ALength);
+                    mbfWriteHoldingRegister: _err:=chASCIIWriteHoldingRegister(buf, ALength);
+                    mbfWriteHoldingRegisters: _err:=chASCIIWriteHoldingRegisters(buf, ALength)
                     else begin
-                      _err:=chASCIIUserFunction(APack, ALength, _DataBt);
+                      _err:=chASCIIUserFunction(buf, ALength, _DataBt);
                       p:=@_DataBt;
                     end;
                   end;
@@ -1382,7 +1384,7 @@ begin
           Name+'"] CallBack',E);
       end;
     finally
-      Dispose(APack);
+      Dispose(buf);
       Dispose(_Data);
     end;
   finally
@@ -2287,13 +2289,13 @@ end;
 procedure TKRMBThread.DoSendASCII(APack: PMBPack; APBuf: PKRBuffer; ABufLen,
   ARecvLen: byte);
 begin
-  FModbus.FConnector.Send(APBuf,ABufLen,FModbus.ConnectorCB,APack,true,ARecvLen);
+  FModbus.FConnector.Send( PByte( APBuf ), ABufLen, FModbus.ConnectorCB, APack, true, ARecvLen );
 end;
 
 procedure TKRMBThread.DoSendRTU(APack: PMBPack; APBuf: PKRBuffer;
   ABufLen: byte; ARecvLen: byte);
 begin
-  FModbus.FConnector.Send(APBuf,ABufLen,FModbus.ConnectorCB,APack,true,ARecvLen);
+  FModbus.FConnector.Send( PByte( APBuf ), ABufLen, FModbus.ConnectorCB, APack, true, ARecvLen );
 end;
 
 procedure TKRMBThread.DoSendTCP(APack: PMBPack; APBuf: PKRBuffer;
@@ -2304,7 +2306,7 @@ begin
     APBuf^[0]:=F_ID;
     if F_ID=255 then F_ID:=1 else Inc(F_ID);
   end else APack^.id:=0;
-  FModbus.FConnector.Send(APBuf,ABufLen,FModbus.ConnectorCB,APack,true,ARecvLen);
+  FModbus.FConnector.Send( PByte( APBuf ), ABufLen, FModbus.ConnectorCB, APack, true, ARecvLen);
 end;
 
 procedure TKRMBThread.DoTCP(APack: PMBPack);

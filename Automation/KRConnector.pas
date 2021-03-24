@@ -30,15 +30,15 @@ type
   TKRConnectorStat = (cstNotActive, cstDisconnected, cstConnected, cstConnecting, cstWaitReconnecting);
 
   TKRConnectorStatEv = procedure(Sender: TObject; AStat: TKRConnectorStat; AReconnectTime: Cardinal)of object;
-  TKRConnectorCallBack = procedure (AError: integer; APack: PKRBuffer; ALength: integer; AData: Pointer) of Object;
-  TKRConnectorPackEv = procedure (Sender: TObject; APack: PKRBuffer; ALength: integer) of Object;
+  TKRConnectorCallBack = procedure (AError: integer; APack: PByte; ALength: integer; AData: Pointer) of Object;
+  TKRConnectorPackEv = procedure (Sender: TObject; APack: PByte; ALength: integer) of Object;
 
 
   TKRConnectorPack = record
     WaitResult: boolean;
     Length, RLen: integer;
     Error: integer;
-    Pack: PKRBuffer;
+    Pack: PByte;
     pData: Pointer;
     CallBack: TKRConnectorCallBack;
   end;
@@ -81,7 +81,7 @@ type
     destructor Destroy;override;
     procedure DoRuntimeError(ADesc: String; E: Exception);
     function GetCounter: Cardinal; stdcall;
-    procedure Send(APack: PKRBuffer; ALength: integer; ACallBack: TKRConnectorCallBack;
+    procedure Send(APack: PByte; ALength: integer; ACallBack: TKRConnectorCallBack;
       AData: Pointer = nil; AWaitResult: boolean = true; ARecvLen: integer = 0);
     function ErrorMsg(AError: TKRConnectorError): String;
     property Active: boolean read GetActive write SetActive;
@@ -240,7 +240,7 @@ begin
   Result:=FThreadOut.FListCount;
 end;
 
-procedure TKRConnector.Send(APack: PKRBuffer; ALength: integer;
+procedure TKRConnector.Send(APack: PByte; ALength: integer;
       ACallBack: TKRConnectorCallBack; AData: Pointer = nil; AWaitResult: boolean = true;
       ARecvLen: integer = 0);
 var

@@ -21,9 +21,7 @@ uses
 
   KRThread, KRGoogleCommon, KRGoogleAuth, KRGoogleAPI,
 
-  KRIdHTTP,
-
-  uLkJSON;
+  KRIdHTTP, KRJSON;
 
 const
   GOOGLE_TRANSLATE_SERVICE_ENDPOINT = 'https://translation.googleapis.com';
@@ -124,9 +122,10 @@ function TKRGoogleTranslate.GetSupportedLanguages( var ASupportedLanguages: TKRG
   ADisplayLanguageCode: String): boolean;
 var
   data: TKRGoogleRESTRequestData;
-  js, js0: TlkJSONObject;
-  jsl: TlkJSONlist;
-  i, n: integer;
+
+  js,jso: TKRJSONObject;
+  jsa: TKRJSONArray;
+  i, n, m: integer;
   delimiter: Char;
 
 begin
@@ -137,7 +136,7 @@ begin
   data.url := GOOGLE_TRANSLATE_SERVICE_ENDPOINT + GOOGLE_TRANSLATE_ADVANCED_REST_RESOURCE +
     FProjectID + '/supportedLanguages' + getParams;
 
-  js:=TlkJSONObject( KRRunInThread( @data, GetSupportedLanguagesTh ) );
+  js:=TKRJSONObject( KRRunInThread( @data, GetSupportedLanguagesTh ) );
 
   if not data.isOk then begin
     FLastErrorMsg := data.ErrorMsg;
@@ -150,32 +149,39 @@ begin
   end;
 
   try
-    jsl := TlkJSONlist( js.Field['languages'] );
-    ASupportedLanguages.FCount := jsl.Count;
-    n := ASupportedLanguages.FCount - 1;
-    SetLength( ASupportedLanguages.list, ASupportedLanguages.FCount );
-    for i := 0 to n do begin
-      js0 := TlkJSONObject( jsl.Child[ i ] );
-      ASupportedLanguages.list[ i ] := TKRGoogleSupportedLanguage.Create(
-        js0.Field['languageCode'].Value,
-        js0.Field['supportSource'].Value,
-        js0.Field['supportTarget'].Value
-      );
-      if js0.IndexOfName( 'displayName' ) > -1 then
-        ASupportedLanguages.list[ i ].FDisplayName := js0.Field['displayName'].Value;
+    i:=js.IndexOf('languages');
+    if (i>-1) and (js[i].ValueType=jstArray) then begin
+      jsa := TKRJSONArray(js[i]);
+      ASupportedLanguages.FCount := jsa.Count;
+      m := ASupportedLanguages.FCount - 1;
+      SetLength( ASupportedLanguages.list, ASupportedLanguages.FCount );
+      n:=0;
+      for i := 0 to m do
+        if jsa[i].ValueType=jstObject then begin
+          jso:=TKRJSONObject(jsa[i]);
+          ASupportedLanguages.list[ n ] := TKRGoogleSupportedLanguage.Create(
+            jso.GetStringDef('languageCode',''),
+            jso.GetBooleanDef('supportSource',false),
+            jso.GetBooleanDef('supportTarget',false),
+            jso.GetStringDef( 'displayName', '' )
+          );
+          inc(n);
+        end;
+      ASupportedLanguages.FCount := n;
+      SetLength( ASupportedLanguages.list, ASupportedLanguages.FCount );
+      Result := true;
     end;
-
-    Result := true;
   except on E: Exception do
     FLastErrorMsg := E.Message;
   end;
+  js.Free;
 end;
 
 function TKRGoogleTranslate.GetSupportedLanguagesTh(AThread: TThread;
   AData: Pointer): Pointer;
 var
   http: TKRIdHTTP;
-  Response: TStringStream;
+  Response: TMemoryStream;
   data: PKRGoogleRESTRequestData;
 begin
   Result:=nil;
@@ -184,8 +190,14 @@ begin
   Http:=HTTPCreate;
   Response := GET( http, data );
 
-  if data.isOk then
-    result := Pointer(TlkJSON.ParseText(Response.DataString));
+  if data.isOk then begin
+    Result := Pointer(TKRJSON.Parse(Response.Memory,Response.Size));
+    data.isOk := Result <> nil;
+    if data.isOk and ( TKRJSON(Result).ValueType<>jstObject ) then begin
+      TKRJSON(Result).Free;
+      data.isOk:=false;
+    end;
+  end;
 
   HTTPDestroy( Http );
   Response.Free;
@@ -196,80 +208,91 @@ function TKRGoogleTranslate.Translate(AContents: TStrings; AMimeType,
   var ATranslations: TKRGoogleTranslations): boolean;
 var
   data: TKRGoogleRESTRequestData;
-  js, js0: TlkJSONobject;
-  jsl: TlkJSONlist;
-  i,n: integer;
-
+  js, jso: TKRJSONObject;
+  jsa: TKRJSONArray;
+  i,n,m: integer;
+  s: String;
+  sa: AnsiString;
 begin
   Result:=false;
   FParams.Clear;
-  js:=TlkJSONobject.Create;
-  jsl:=TlkJSONlist.Create;
-  try
-    js.Add( 'mimeType', AMimeType);
-    js.Add( 'targetLanguageCode', ATargetLanguage);
-    if ASourceLanguage<>'' then
-      js.Add( 'sourceLanguageCode', ASourceLanguage);
+  n:=0;
+  js:=TKRJSONobject.Create;
+  js.AddChild( TKRJSONString.Create('mimeType', AMimeType ));
+  js.AddChild( TKRJSONString.Create('targetLanguageCode', ATargetLanguage ));
+  if ASourceLanguage<>'' then
+    js.AddChild( TKRJSONString.Create('sourceLanguageCode', ASourceLanguage ));
 
-    n:=AContents.Count-1;
-    for I := 0 to n do
-      jsl.Add( AContents[i] );
-
-    js.Add( 'contents', jsl);
-
-    data.data := TlkJSON.GenerateText( js );
-  finally
-    js.Free;
+  jsa:=TKRJSONArray.Create;
+  jsa.Key:='contents';
+  n:=AContents.Count-1;
+  for I := 0 to n do begin
+    s:=Trim( AContents[i] );
+    if s<>'' then begin
+      inc(n);
+      jsa.AddChild( TKRJSONString.Create( s ) );
+    end;
   end;
+  js.AddChild(jsa);
+  if n=0 then begin
+    js.Free;
+    FLastErrorMsg := '[1]Empty data!';
+    exit;
+  end;
+  data.sData:=TMemoryStream.Create;
+  sa:=js.toString;
+  data.sData.Write( sa[1], Length(sa) );
+  js.Free;
 
   data.url := GOOGLE_TRANSLATE_SERVICE_ENDPOINT + GOOGLE_TRANSLATE_ADVANCED_REST_RESOURCE +
     FProjectID + ':translateText' + getParams;
 
-  js:=TlkJSONObject( KRRunInThread( @data, TranslateTh ) );
-
+  js:=TKRJSONObject( KRRunInThread( @data, TranslateTh ) );
+  data.sData.Free;
   if not data.isOk then begin
     FLastErrorMsg := data.ErrorMsg;
-    exit;
-  end;
-
-  if not Assigned( js ) then begin
-    FLastErrorMsg := '[1]Response JSON Error!';
+    if FLastErrorMsg='' then
+      FLastErrorMsg := '[1]Response JSON Error!';
     exit;
   end;
 
   try
-    jsl := TlkJSONlist( js.Field['translations'] );
-    ATranslations.FCount := jsl.Count;
-    n := ATranslations.FCount - 1;
-    SetLength( ATranslations.list, ATranslations.FCount );
-    for i := 0 to n do begin
-      js0 := TlkJSONobject( jsl.Child[ i ] );
+    i:=js.IndexOf('translations');
+    if(i>-1)and(js[i].ValueType=jstArray) then begin
+      jsa := TKRJSONArray( js[i] );
+      ATranslations.FCount := jsa.Count;
+      m := ATranslations.FCount - 1;
+      SetLength( ATranslations.list, ATranslations.FCount );
+      n:=0;
+      for i := 0 to m do
+        if jsa[i].ValueType=jstObject then begin
+          jso := TKRJSONObject( jsa[ i ] );
+          ATranslations.list[ n ] :=
+            TKRGoogleTranslation.Create(
+              jso.GetStringDef( 'translatedText' , '' ),
+              jso.GetStringDef( 'model' , '' ),
+              jso.GetStringDef( 'detectedLanguageCode' , '' )
+            );
+          {if js0.IndexOfName( 'glossaryConfig' ) > -1 then begin
 
-      ATranslations.list[ i ] :=
-        TKRGoogleTranslation.Create(
-          js0.Field[ 'translatedText' ].Value
-        );
-      if js0.IndexOfName( 'model' ) > -1 then ATranslations.list[i].FModel := js0.Field[ 'model' ].Value;
-      if js0.IndexOfName( 'detectedLanguageCode' ) > -1 then ATranslations.list[i].FDetectedLanguageCode := js0.Field[ 'detectedLanguageCode' ].Value;
-      if js0.IndexOfName( 'glossaryConfig' ) > -1 then begin
-
-      end;
-
+          end;}
+          inc( n );
+        end;
+      ATranslations.FCount := n;
+      SetLength( ATranslations.list, ATranslations.FCount );
+      Result := true;
     end;
-
-    Result := true;
-
   except on E: Exception do
     FLastErrorMsg := E.Message;
   end;
-
+  js.free;
 end;
 
 function TKRGoogleTranslate.TranslateTh(AThread: TThread;
   AData: Pointer): Pointer;
 var
   http: TKRIdHTTP;
-  Response: TStringStream;
+  Response: TMemoryStream;
   data: PKRGoogleRESTRequestData;
 begin
   Result:=nil;
@@ -279,8 +302,14 @@ begin
 
   Response := POST( http, data, 'application/json');
 
-  if data.isOk then
-    result := Pointer(TlkJSON.ParseText(Response.DataString));
+  if data.isOk then begin
+    Result := Pointer(TKRJSON.Parse(Response.Memory,Response.Size));
+    data.isOk := Result <> nil;
+    if data.isOk and ( TKRJSON(Result).ValueType<>jstObject ) then begin
+      TKRJSON(Result).Free;
+      data.isOk:=false;
+    end;
+  end;
 
   HTTPDestroy( Http );
   Response.Free;

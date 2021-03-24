@@ -27,6 +27,14 @@ type
   end;
   PKRLBuffer = ^TKRLBuffer;
 
+  TKRBuffer2k = array[0..2047] of byte;
+  PKRBuffer2k = ^TKRBuffer2k;
+  TKRLBuffer2k = record
+    buf: TKRBuffer;
+    len: integer;
+  end;
+  PKRLBuffer2k = ^TKRLBuffer2k;
+
   TKRRegister = word;
   TKRRegisters = array of TKRRegister;
   PKRRegisters = ^TKRRegisters;

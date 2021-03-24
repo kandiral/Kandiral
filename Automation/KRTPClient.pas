@@ -22,7 +22,7 @@ uses
 
 type
   TKRTPClientPack = record
-    Pack: TKRBuffer;
+    Pack: TKRBuffer2k;
     PackLen: byte;
     RecvLen: byte;
     ID: byte;
@@ -54,7 +54,7 @@ type
     destructor Destroy;override;
     property Active: boolean read GetActive write SetActive;
     property Connected: boolean read FConnected;
-    function CheckPack(ABuffer: PKRBuffer; ALength: byte; APack: PKRTPClientPack): integer;
+    function CheckPack(ABuffer: PKRBuffer2k; ALength: byte; APack: PKRTPClientPack): integer;
     procedure SendPack(APack: PKRTPClientPack);
     function GetTPName: String;
   published
@@ -69,10 +69,10 @@ type
     FEchoInProgress: boolean;
     FGetNameInProgress: boolean;
     procedure Echo;
-    procedure EchoCB(AError: integer; APack: PKRBuffer; ALength: integer; AData: Pointer);
+    procedure EchoCB(AError: integer; APack: PByte; ALength: integer; AData: Pointer);
     procedure EchoTmExec(var Msg: TMessage);
     procedure GetName;
-    procedure GetNameCB(AError: integer; APack: PKRBuffer; ALength: integer; AData: Pointer);
+    procedure GetNameCB(AError: integer; APack: PByte; ALength: integer; AData: Pointer);
   protected
     procedure KRExecute; override;
     procedure KRExecutePausedFirst; override;
@@ -84,7 +84,7 @@ implementation
 
 { TKRTPClient }
 
-function TKRTPClient.CheckPack(ABuffer: PKRBuffer; ALength: byte;
+function TKRTPClient.CheckPack(ABuffer: PKRBuffer2k; ALength: byte;
   APack: PKRTPClientPack): integer;
 begin
   Result:=0;
@@ -96,7 +96,7 @@ begin
     Result:=2;
     exit;
   end;
-  if KRCRC16(ABuffer,ALength-2)<>MakeWord(ABuffer^[ALength-2],ABuffer^[ALength-1]) then begin
+  if KRCRC16( @ABuffer^[0], ALength - 2 ) <> MakeWord( ABuffer^[ ALength - 2 ], ABuffer^[ ALength - 1 ] ) then begin
     Result:=3;
     exit;
   end;
@@ -219,14 +219,14 @@ begin
   FClient.SendPack(pk);
 end;
 
-procedure TKRTPClientThread.EchoCB(AError: integer; APack: PKRBuffer;
+procedure TKRTPClientThread.EchoCB(AError: integer; APack: PByte;
   ALength: integer; AData: Pointer);
 var
   pk: PKRTPClientPack;
 begin
   pk:=AData;
   if AError=0 then begin
-    FClient.FConnected:=FClient.CheckPack(APack,ALength,pk)=0;
+    FClient.FConnected:=FClient.CheckPack( PKRBuffer2k(APack) , ALength, pk )=0;
   end;
   Dispose(pk);
   if Active and (FClient.FEchoInterval>0) then
@@ -256,18 +256,20 @@ begin
   FClient.SendPack(pk);
 end;
 
-procedure TKRTPClientThread.GetNameCB(AError: integer; APack: PKRBuffer;
+procedure TKRTPClientThread.GetNameCB(AError: integer; APack: PByte;
   ALength: integer; AData: Pointer);
 var
   pk: PKRTPClientPack;
   s: String;
   i: integer;
+  buf: PKRBuffer2k;
 begin
   pk:=AData;
+  buf:=PKRBuffer2k(APack);
   if AError=0 then begin
-    if FClient.CheckPack(APack,ALength,pk)=0 then begin
+    if FClient.CheckPack( buf, ALength, pk)=0 then begin
       s:='';
-      for i := 3 to ALength-4 do s:=s+Chr(APack^[i]);
+      for i := 3 to ALength-4 do s:=s+Chr(buf^[i]);
       FClient.FTPName:=s;
     end;
   end;
