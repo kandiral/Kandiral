@@ -1,9 +1,0 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<BorlandProject>
-	<Transactions>
-    <Transaction>1899.12.30 00:00:00.000.321,C:\Users\kandiral\Documents\Embarcadero\Studio\Projects\ProjectGroup1.groupproj=X:\Components\Kandiral\Kandiral200.groupproj</Transaction>
-  </Transactions>
-	<Default.Personality>
-		<Projects ActiveProject="X:\Components\Kandiral\packages\d200\KRCommon.dproj"/>
-	</Default.Personality>
-</BorlandProject>

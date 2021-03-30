@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRConnector                                                               *)
-(*  Ver.: 18.02.2021                                                          *)
+(*  Ver.: 18.03.2021                                                          *)
 (*  https://kandiral.ru/delphi/krconnector.pas.html                           *)
 (*                                                                            *)
 (******************************************************************************)

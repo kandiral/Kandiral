@@ -3,10 +3,6 @@
 (*  Kandiral Ruslan                                                           *)
 (*  http://kandiral.ru                                                        *)
 (*                                                                            *)
-(*  KRFileRegister                                                            *)
-(*  Ver.: 15.01.2017                                                          *)
-(*                                                                            *)
-(*                                                                            *)
 (******************************************************************************)
 unit KRFileRegister;
 

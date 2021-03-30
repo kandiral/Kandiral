@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRModbusClient                                                            *)
-(*  Ver.: 23.08.2020                                                          *)
+(*  Ver.: 17.02.2021                                                          *)
 (*  https://kandiral.ru/delphi/krmodbusclient.pas.html                        *)
 (*                                                                            *)
 (******************************************************************************)

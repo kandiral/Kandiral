@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRGoogleContacts                                                          *)
-(*  Ver.: 23.03.2021                                                          *)
+(*  Ver.: 30.03.2021                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -214,7 +214,6 @@ type
   TGoogleContact = class(TObject)
   private
     contacts: TKRGoogleContacts;
-    FChecked: boolean;
     FID, FID_, FETag, fxml: String;
     FName: TGoogleContactName;
     FPhoto: TGoogleContactPhoto;
@@ -341,7 +340,6 @@ type
     procedure groupDataToXml(AXML: String; grp: TKRGoogleContactsGroup; AStream: TStream);
     function GetGroup(AIndex: Integer): TKRGoogleContactsGroup;
     function GetGroupCount: integer;
-    procedure SetGoogleAuth(const Value: TKRGoogleAuth);
     procedure SetDataFolder(const Value: TFileName);
   protected
     function HTTPCreate: TKRIdHTTP; override;
@@ -1203,18 +1201,6 @@ begin
   if (csDesigning in ComponentState) then
     FDataFolder:=ExtractFilePath(Value)
   else FDataFolder:=Value;
-end;
-
-procedure TKRGoogleContacts.SetGoogleAuth(const Value: TKRGoogleAuth);
-begin
-  if FGoogleAuth<>Value then begin
-    if Assigned(FGoogleAuth) then FGoogleAuth.RemoveFreeNotification(Self);
-    FGoogleAuth := Value;
-    if Assigned(FGoogleAuth) then begin
-      FGoogleAuth.FreeNotification(Self);
-      FGoogleAuth.Scope:=FGoogleAuth.Scope + [gscContacts];
-    end;
-  end;
 end;
 
 procedure TKRGoogleContacts.UpdateModified;

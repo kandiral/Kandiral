@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRGoogleAuth                                                              *)
-(*  Ver.: 05.03.2021                                                          *)
+(*  Ver.: 18.03.2021                                                          *)
 (*  https://kandiral.ru/delphi/krgoogleauth.pas.html                          *)
 (*                                                                            *)
 (******************************************************************************)

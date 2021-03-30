@@ -1,3 +1,9 @@
+(******************************************************************************)
+(*                                                                            *)
+(*  Kandiral Ruslan                                                           *)
+(*  http://kandiral.ru                                                        *)
+(*                                                                            *)
+(******************************************************************************)
 unit KRWebRegister;
 
 interface
@@ -13,12 +19,12 @@ procedure Register;
 
 implementation
 
-uses KRGoogleAuth, KRGoogleContacts, KRGoogleSearchConsole;
+uses KRGoogleAuth, KRGoogleContacts;
 
 procedure Register;
 begin
-  RegisterClasses([TKRGoogleAuth, TKRGoogleContacts, TKRGoogleSearchConsole]);
-  RegisterComponents('KRWeb', [TKRGoogleAuth, TKRGoogleContacts, TKRGoogleSearchConsole]);
+  RegisterClasses([TKRGoogleAuth, TKRGoogleContacts]);
+  RegisterComponents('KRWeb', [TKRGoogleAuth, TKRGoogleContacts]);
 end;
 
 end.

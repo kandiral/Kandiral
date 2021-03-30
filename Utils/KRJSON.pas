@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRJSON                                                                    *)
-(*  Ver.: 18.03.2021                                                          *)
+(*  Ver.: 30.03.2021                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -134,6 +134,7 @@ type
   public
     function toString: AnsiString; override;
     function IndexOf( AKey: String): integer;
+    function ArrayOf( AKey: String; out Index: integer): boolean;
     function StringOf( AKey: String; out Index: integer): boolean;
     function IntegerOf( AKey: String; out Index: integer): boolean;
     function FloatOf( AKey: String; out Index: integer): boolean;
@@ -704,6 +705,20 @@ begin
 end;
 
 { TKRJSONObject }
+
+function TKRJSONObject.ArrayOf(AKey: String; out Index: integer): boolean;
+var
+  i, n: integer;
+begin
+  Result:=false;
+  n := FCount - 1;
+  for I := 0 to n do
+    if(FChildren[ i ].FKey = AKey) and (FChildren[ i ].ValueType = jstArray) then begin
+      Result:=true;
+      Index:=i;
+      exit;
+    end;
+end;
 
 function TKRJSONObject.BooleanOf(AKey: String; out Index: integer): boolean;
 var

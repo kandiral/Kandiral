@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRCOMPortConnector                                                        *)
-(*  Ver.: 17.03.2020                                                          *)
+(*  Ver.: 01.03.2021                                                          *)
 (*  https://kandiral.ru/delphi/krcomportconnector.pas.html                    *)
 (*                                                                            *)
 (******************************************************************************)

@@ -109,8 +109,6 @@
         <DCCReference Include="..\..\Web\KRGoogleAuth.pas"/>
         <DCCReference Include="..\..\Web\KRGoogleCommon.pas"/>
         <DCCReference Include="..\..\Web\KRGoogleContacts.pas"/>
-        <DCCReference Include="..\..\Web\KRGoogleSearchConsole.pas"/>
-        <DCCReference Include="..\..\Web\KRGoogleSheets.pas"/>
         <DCCReference Include="..\..\Web\KRGoogleTranslate.pas"/>
         <DCCReference Include="..\..\Web\KRIdHTTP.pas"/>
         <DCCReference Include="..\..\Web\KRWebCommon.pas"/>

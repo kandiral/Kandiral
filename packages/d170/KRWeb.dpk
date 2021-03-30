@@ -44,8 +44,6 @@ contains
   KRGoogleAuth in '..\..\Web\KRGoogleAuth.pas',
   KRGoogleCommon in '..\..\Web\KRGoogleCommon.pas',
   KRGoogleContacts in '..\..\Web\KRGoogleContacts.pas',
-  KRGoogleSearchConsole in '..\..\Web\KRGoogleSearchConsole.pas',
-  KRGoogleSheets in '..\..\Web\KRGoogleSheets.pas',
   KRGoogleTranslate in '..\..\Web\KRGoogleTranslate.pas',
   KRIdHTTP in '..\..\Web\KRIdHTTP.pas',
   KRWebCommon in '..\..\Web\KRWebCommon.pas',

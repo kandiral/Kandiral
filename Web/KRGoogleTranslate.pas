@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRGoogleTranslate                                                         *)
-(*  Ver.: 04.03.2021                                                          *)
+(*  Ver.: 30.03.2021                                                          *)
 (*                                                                            *)
 (*                                                                            *)
 (******************************************************************************)
@@ -126,7 +126,6 @@ var
   js,jso: TKRJSONObject;
   jsa: TKRJSONArray;
   i, n, m: integer;
-  delimiter: Char;
 
 begin
   Result:=false;
@@ -216,7 +215,7 @@ var
 begin
   Result:=false;
   FParams.Clear;
-  n:=0;
+
   js:=TKRJSONobject.Create;
   js.AddChild( TKRJSONString.Create('mimeType', AMimeType ));
   js.AddChild( TKRJSONString.Create('targetLanguageCode', ATargetLanguage ));

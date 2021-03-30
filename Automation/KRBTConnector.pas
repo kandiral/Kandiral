@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRBTConnector                                                             *)
-(*  Ver.: 17.03.2020                                                          *)
+(*  Ver.: 19.01.2021                                                          *)
 (*  https://kandiral.ru/delphi/krbtconnector.pas.html                         *)
 (*                                                                            *)
 (******************************************************************************)

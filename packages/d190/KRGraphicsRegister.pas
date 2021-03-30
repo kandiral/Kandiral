@@ -3,10 +3,6 @@
 (*  Kandiral Ruslan                                                           *)
 (*  http://kandiral.ru                                                        *)
 (*                                                                            *)
-(*  KRGraphicsRegister                                                        *)
-(*  Ver.: 31.08.2017                                                          *)
-(*                                                                            *)
-(*                                                                            *)
 (******************************************************************************)
 unit KRGraphicsRegister;
 

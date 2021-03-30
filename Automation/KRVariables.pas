@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRVariables                                                               *)
-(*  Ver.: 14.07.2020                                                          *)
+(*  Ver.: 08.02.2021                                                          *)
 (*  https://kandiral.ru/delphi/krvariables.pas.html                           *)
 (*                                                                            *)
 (******************************************************************************)

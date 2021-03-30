@@ -3,10 +3,6 @@
 (*  Kandiral Ruslan                                                           *)
 (*  http://kandiral.ru                                                        *)
 (*                                                                            *)
-(*  KRAutomationRegister                                                      *)
-(*  Ver.: 31.08.2017                                                          *)
-(*                                                                            *)
-(*                                                                            *)
 (******************************************************************************)
 unit KRAutomationRegister;
 
