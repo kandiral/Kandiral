@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRModbusMaster                                                            *)
-(*  Ver.: 18.03.2021                                                          *)
+(*  Ver.: 04.03.2021                                                          *)
 (*  https://kandiral.ru/delphi/krmodbusmaster.pas.html                        *)
 (*                                                                            *)
 (******************************************************************************)

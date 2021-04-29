@@ -58,7 +58,8 @@ const
     'Invalid data length',
     'Queue is overflow',
     'Timeout',
-    'Runtime error'
+    'Runtime error',
+    'Modbus not active'
 {$ENDIF}
   );
 

@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRVCheckBox                                                               *)
-(*  Ver.: 12.01.2021                                                          *)
+(*  Ver.: 31.08.2017                                                          *)
 (*  https://kandiral.ru/delphi/krvcheckbox.pas.html                           *)
 (*                                                                            *)
 (******************************************************************************)

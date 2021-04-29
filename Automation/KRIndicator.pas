@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRIndicator                                                               *)
-(*  Ver.: 11.01.2021                                                          *)
+(*  Ver.: 31.08.2017                                                          *)
 (*  https://kandiral.ru/delphi/krindicator.pas.html                           *)
 (*                                                                            *)
 (******************************************************************************)

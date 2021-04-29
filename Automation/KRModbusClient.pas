@@ -4,7 +4,7 @@
 (*  https://kandiral.ru                                                       *)
 (*                                                                            *)
 (*  KRModbusClient                                                            *)
-(*  Ver.: 17.02.2021                                                          *)
+(*  Ver.: 23.08.2020                                                          *)
 (*  https://kandiral.ru/delphi/krmodbusclient.pas.html                        *)
 (*                                                                            *)
 (******************************************************************************)
@@ -35,6 +35,8 @@ type
   TMBSetStreamProcWD = procedure(AValue: word) of object;
   TMBSetStreamProcSINT = procedure(AValue: Smallint) of object;
   TMBSetStreamProcDW = procedure(AFirst: boolean; AValue: Cardinal) of object;
+
+  TCallBackEvent = procedure( Sender: TObject; var AError: integer; AData: Pointer ) of object;
 
   TKRMBRegFileInfo = record
     crc16: Word;
@@ -99,6 +101,7 @@ type
     FHighByteFirst: boolean;
     FHighWordFirst: boolean;
     FHighDWordFirst: boolean;
+    FReadCallBack: TCallBackEvent;
     procedure _RCallBack(AError: integer; AData: Pointer);
     procedure _WCallBack(AError: integer; AData: Pointer);
     procedure _WCallBack0(AError: integer; AData: Pointer);
@@ -230,6 +233,8 @@ type
     property UserErrorMsg;
     property OnRuntimeError;
     property OnFile: TNotifyEvent read FOnFile write FOnFile;
+
+    property OnReadCallBack: TCallBackEvent read FReadCallBack write FReadCallBack;
   end;
 
   TKRMBCBatchUpdates = class;
@@ -248,6 +253,7 @@ type
     FReadPack: TKRBuffer;
     FReadPackLen,FReadPackRLen: byte;
     FReadPackFunc: TMBFunc;
+    FCallBack: TCallBackEvent;
     procedure TmWP(var Msg: TMessage);
     procedure SetInterval(const Value: Cardinal);
     procedure SetReadFunction(const Value: TMBReadFunction);
@@ -266,6 +272,7 @@ type
     property Interval: Cardinal read FInterval write SetInterval default 0;
     property IntervalMin: cardinal read FIntervalMin write FIntervalMin default 5;
     property ReadFunction: TMBReadFunction read FReadFunction write SetReadFunction default mbrfReadHoldingRegisters;
+    property OnCallBack: TCallBackEvent read FCallBack write FCallBack;
   end;
 
   TKRMBCBatchUpdates = class(TCollection)
@@ -2447,6 +2454,8 @@ var
   wd: word;
   async: boolean;
 begin
+  if Assigned( FReadCallBack ) then FReadCallBack( Self, AError, AData );
+
   if AError=-2147483648 then begin
     FError:=0;
     async:=true;
@@ -2628,6 +2637,8 @@ var
   reg: TKRMBRegister;
   tm: cardinal;
 begin
+  if Assigned( FCallBack ) then FCallBack( Self, AError, AData );
+
   if AError=0 then begin
     data:=AData;
     if Length(data^)=FCount then begin
